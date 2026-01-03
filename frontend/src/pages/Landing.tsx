@@ -254,49 +254,57 @@ export const Landing = () => {
         </div>
       </section>
 
-      {/* Comparison Section */}
+      {/* Why PostPilot Section */}
       <section className="bg-primary/5 py-16">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-text mb-8">
-            Warum PostPilot statt Microsoft Copilot?
+          <h2 className="text-2xl md:text-3xl font-bold text-center text-text mb-4">
+            Speziell für den deutschen Markt entwickelt
           </h2>
-          <div className="bg-white rounded-2xl border border-border overflow-x-auto">
-            <table className="w-full min-w-[500px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 md:px-6 py-4 text-left font-semibold text-text">Feature</th>
-                  <th className="px-4 md:px-6 py-4 text-center font-semibold text-primary">PostPilot</th>
-                  <th className="px-4 md:px-6 py-4 text-center font-semibold text-text-secondary">Copilot</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                <tr>
-                  <td className="px-4 md:px-6 py-4">Native deutsche Antworten</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-green-600 font-medium">✓</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-red-500">Übersetzt</td>
-                </tr>
-                <tr>
-                  <td className="px-4 md:px-6 py-4">Automatische Kategorisierung</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-green-600 font-medium">✓ 6 Kategorien</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-red-500">✗</td>
-                </tr>
-                <tr>
-                  <td className="px-4 md:px-6 py-4">Action Board mit Deadlines</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-green-600 font-medium">✓</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-red-500">✗</td>
-                </tr>
-                <tr>
-                  <td className="px-4 md:px-6 py-4">Ton & Absicht wählbar</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-green-600 font-medium">✓ 4 Töne</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-orange-500">Begrenzt</td>
-                </tr>
-                <tr>
-                  <td className="px-4 md:px-6 py-4">Preis</td>
-                  <td className="px-4 md:px-6 py-4 text-center font-bold text-primary">ab 0€</td>
-                  <td className="px-4 md:px-6 py-4 text-center text-text-secondary">30€/User/Monat</td>
-                </tr>
-              </tbody>
-            </table>
+          <p className="text-center text-text-secondary mb-12 max-w-2xl mx-auto">
+            PostPilot wurde von Grund auf für deutschsprachige Geschäftskommunikation konzipiert
+          </p>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white rounded-xl p-6 border border-border text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-text mb-2">Native deutsche Antworten</h3>
+              <p className="text-sm text-text-secondary">
+                KI-Antworten in natürlichem Deutsch – keine Übersetzungen, kein "Denglisch"
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-6 border border-border text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-text mb-2">6 Business-Kategorien</h3>
+              <p className="text-sm text-text-secondary">
+                Dringend, Aktion, Info, Meeting, Finanzen, Intern – automatisch zugeordnet
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-6 border border-border text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <BarChart3 className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-text mb-2">Action Board</h3>
+              <p className="text-sm text-text-secondary">
+                Extrahierte Aufgaben mit Deadlines – nie wieder eine Anfrage übersehen
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-6 border border-border text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Zap className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-text mb-2">4 Antwort-Töne</h3>
+              <p className="text-sm text-text-secondary">
+                Formell, locker, freundlich oder bestimmt – du wählst den passenden Stil
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 text-center">
+            <p className="text-lg font-semibold text-primary">
+              Kostenlos starten – ohne Kreditkarte
+            </p>
           </div>
         </div>
       </section>
