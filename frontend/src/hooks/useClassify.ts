@@ -19,7 +19,7 @@ export const useClassify = () => {
     },
   });
 
-  // Mehrere E-Mails klassifizieren
+  // Mehrere E-Mails klassifizieren (automatisch in 20er-Chunks aufgeteilt)
   const classifyBatchMutation = useMutation({
     mutationFn: async (emails: Email[]): Promise<BatchClassificationResult> => {
       const preparedEmails = emails.map((email) => ({
@@ -32,7 +32,28 @@ export const useClassify = () => {
         sender: email.from.emailAddress.address,
       }));
 
-      return classifyEmailBatch({ emails: preparedEmails });
+      // Split into chunks of 20 (API limit)
+      const BATCH_SIZE = 20;
+      const chunks: typeof preparedEmails[] = [];
+      for (let i = 0; i < preparedEmails.length; i += BATCH_SIZE) {
+        chunks.push(preparedEmails.slice(i, i + BATCH_SIZE));
+      }
+
+      // Process all chunks and combine results
+      const allResults: BatchClassificationResult = {
+        results: [],
+        totalTokens: 0,
+        processingTimeMs: 0,
+      };
+
+      for (const chunk of chunks) {
+        const result = await classifyEmailBatch({ emails: chunk });
+        allResults.results.push(...result.results);
+        allResults.totalTokens += result.totalTokens;
+        allResults.processingTimeMs += result.processingTimeMs;
+      }
+
+      return allResults;
     },
   });
 
