@@ -48,12 +48,22 @@ export const useCategories = () => {
 
     for (const category of CATEGORIES) {
       if (!existingNames.includes(category.name)) {
-        await createCategoryMutation.mutateAsync({
-          displayName: category.name,
-          color: category.color,
-        });
+        try {
+          await createCategoryMutation.mutateAsync({
+            displayName: category.name,
+            color: category.color,
+          });
+        } catch (error) {
+          // Ignore "CategoryNameExists" error - category already exists
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (!errorMessage.includes('CategoryNameExists') && !errorMessage.includes('already exists')) {
+            throw error;
+          }
+        }
       }
     }
+    // Refresh the list after sync
+    queryClient.invalidateQueries({ queryKey: ['masterCategories'] });
   };
 
   return {
