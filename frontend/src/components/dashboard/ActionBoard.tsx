@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Loader2, Sparkles, Calendar, ExternalLink } from 'lucide-react';
 import type { Email } from '../../types';
-import { extractActions, ExtractedAction, getPriorityColor, getTypeIcon, getTypeLabel } from '../../services/actionService';
+import { extractActions, getPriorityColor, getTypeIcon, getTypeLabel } from '../../services/actionService';
+import type { ExtractedAction } from '../../services/actionService';
 import { prepareBodyForClassification } from '../../services/classifyService';
 
 interface ActionBoardProps {
