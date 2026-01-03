@@ -20,6 +20,13 @@ import {
   Building2,
   Server,
   Headphones,
+  Eye,
+  EyeOff,
+  Database,
+  FileX,
+  ShieldCheck,
+  XCircle,
+  ArrowRight,
 } from 'lucide-react';
 import { graphScopes } from '../config/msalConfig';
 
@@ -528,45 +535,212 @@ export const Landing = () => {
         </div>
       </section>
 
-      {/* Security Section */}
-      <section id="security" className="max-w-6xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-bold text-text mb-4">
-            Sicherheit & Datenschutz
-          </h2>
-          <p className="text-lg text-text-secondary">
-            Deine Daten gehören dir – wir nehmen das ernst
-          </p>
-        </div>
+      {/* Security & DSGVO Section */}
+      <section id="security" className="bg-gray-50 py-16">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
+              <ShieldCheck className="w-4 h-4" />
+              100% DSGVO-konform
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-text mb-4">
+              Volle Transparenz bei Datenschutz & Sicherheit
+            </h2>
+            <p className="text-lg text-text-secondary max-w-2xl mx-auto">
+              Wir wissen, dass E-Mails sensible Daten enthalten. Deshalb haben wir PostPilot
+              von Grund auf mit Datenschutz im Fokus entwickelt.
+            </p>
+          </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="text-center p-4 md:p-6">
-            <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Shield className="w-7 h-7 text-green-600" />
+          {/* What we DO and DON'T do */}
+          <div className="grid md:grid-cols-2 gap-8 mb-12">
+            {/* What we DO */}
+            <div className="bg-white rounded-2xl p-6 md:p-8 border border-green-200">
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-green-700 mb-6">
+                <CheckCircle className="w-5 h-5" />
+                Was wir tun
+              </h3>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Nur lesen, nie speichern</strong>
+                    <p className="text-sm text-text-secondary">E-Mails werden nur zur Analyse gelesen und sofort verworfen</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Verarbeitung in der EU</strong>
+                    <p className="text-sm text-text-secondary">Alle Server stehen in Deutschland (Azure West Europe)</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Verschlüsselte Übertragung</strong>
+                    <p className="text-sm text-text-secondary">TLS 1.3 für alle Verbindungen, keine Ausnahmen</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Microsoft OAuth 2.0</strong>
+                    <p className="text-sm text-text-secondary">Login über Microsoft – wir sehen dein Passwort nie</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Jederzeit widerrufbar</strong>
+                    <p className="text-sm text-text-secondary">Zugriff in den Microsoft-Kontoeinstellungen sofort entziehen</p>
+                  </div>
+                </li>
+              </ul>
             </div>
-            <h3 className="font-semibold text-text mb-2">DSGVO-konform</h3>
-            <p className="text-sm text-text-secondary">Vollständig EU-Datenschutz konform</p>
+
+            {/* What we DON'T do */}
+            <div className="bg-white rounded-2xl p-6 md:p-8 border border-red-200">
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-red-700 mb-6">
+                <XCircle className="w-5 h-5" />
+                Was wir NICHT tun
+              </h3>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Keine E-Mail-Speicherung</strong>
+                    <p className="text-sm text-text-secondary">Wir speichern weder Inhalte noch Anhänge auf unseren Servern</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Kein Verkauf von Daten</strong>
+                    <p className="text-sm text-text-secondary">Deine Daten werden niemals verkauft oder für Werbung genutzt</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Kein KI-Training</strong>
+                    <p className="text-sm text-text-secondary">Deine E-Mails werden nicht zum Trainieren von KI-Modellen verwendet</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Keine versteckten Zugriffe</strong>
+                    <p className="text-sm text-text-secondary">Nur die Berechtigungen, die du explizit siehst und genehmigst</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-text">Keine Datenweitergabe</strong>
+                    <p className="text-sm text-text-secondary">Außer Azure OpenAI (DSGVO-konform) keine Dritten involviert</p>
+                  </div>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div className="text-center p-4 md:p-6">
-            <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-7 h-7 text-blue-600" />
+
+          {/* Data Flow Diagram */}
+          <div className="bg-white rounded-2xl p-6 md:p-8 border border-border mb-12">
+            <h3 className="text-lg font-semibold text-text mb-6 text-center">
+              So funktioniert der Datenfluss
+            </h3>
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-2">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mb-2">
+                  <Mail className="w-8 h-8 text-blue-600" />
+                </div>
+                <span className="text-sm font-medium">Dein Outlook</span>
+                <span className="text-xs text-text-secondary">Microsoft 365</span>
+              </div>
+
+              <ArrowRight className="w-6 h-6 text-gray-400 rotate-90 md:rotate-0" />
+
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mb-2">
+                  <Eye className="w-8 h-8 text-green-600" />
+                </div>
+                <span className="text-sm font-medium">PostPilot liest</span>
+                <span className="text-xs text-text-secondary">Nur Betreff & Body</span>
+              </div>
+
+              <ArrowRight className="w-6 h-6 text-gray-400 rotate-90 md:rotate-0" />
+
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mb-2">
+                  <Brain className="w-8 h-8 text-purple-600" />
+                </div>
+                <span className="text-sm font-medium">KI analysiert</span>
+                <span className="text-xs text-text-secondary">Azure OpenAI (EU)</span>
+              </div>
+
+              <ArrowRight className="w-6 h-6 text-gray-400 rotate-90 md:rotate-0" />
+
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mb-2">
+                  <Sparkles className="w-8 h-8 text-primary" />
+                </div>
+                <span className="text-sm font-medium">Kategorie zurück</span>
+                <span className="text-xs text-text-secondary">Nur das Label</span>
+              </div>
+
+              <ArrowRight className="w-6 h-6 text-gray-400 rotate-90 md:rotate-0" />
+
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-2">
+                  <FileX className="w-8 h-8 text-red-500" />
+                </div>
+                <span className="text-sm font-medium">Daten gelöscht</span>
+                <span className="text-xs text-text-secondary">Nichts gespeichert</span>
+              </div>
             </div>
-            <h3 className="font-semibold text-text mb-2">Verschlüsselt</h3>
-            <p className="text-sm text-text-secondary">TLS 1.3 Ende-zu-Ende</p>
           </div>
-          <div className="text-center p-4 md:p-6">
-            <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Globe className="w-7 h-7 text-purple-600" />
+
+          {/* Trust Badges */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center p-4 md:p-6 bg-white rounded-xl border border-border">
+              <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-7 h-7 text-green-600" />
+              </div>
+              <h3 className="font-semibold text-text mb-2">DSGVO Art. 28</h3>
+              <p className="text-sm text-text-secondary">AVV auf Anfrage verfügbar</p>
             </div>
-            <h3 className="font-semibold text-text mb-2">EU-Server</h3>
-            <p className="text-sm text-text-secondary">Daten bleiben in der EU</p>
+            <div className="text-center p-4 md:p-6 bg-white rounded-xl border border-border">
+              <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-7 h-7 text-blue-600" />
+              </div>
+              <h3 className="font-semibold text-text mb-2">SOC 2 Type II</h3>
+              <p className="text-sm text-text-secondary">Azure-Infrastruktur zertifiziert</p>
+            </div>
+            <div className="text-center p-4 md:p-6 bg-white rounded-xl border border-border">
+              <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Globe className="w-7 h-7 text-purple-600" />
+              </div>
+              <h3 className="font-semibold text-text mb-2">ISO 27001</h3>
+              <p className="text-sm text-text-secondary">Informationssicherheit</p>
+            </div>
+            <div className="text-center p-4 md:p-6 bg-white rounded-xl border border-border">
+              <div className="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Database className="w-7 h-7 text-orange-600" />
+              </div>
+              <h3 className="font-semibold text-text mb-2">EU-Server</h3>
+              <p className="text-sm text-text-secondary">Azure Germany West Central</p>
+            </div>
           </div>
-          <div className="text-center p-4 md:p-6">
-            <div className="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Users className="w-7 h-7 text-orange-600" />
-            </div>
-            <h3 className="font-semibold text-text mb-2">Kein Zugriff</h3>
-            <p className="text-sm text-text-secondary">Wir speichern keine E-Mails</p>
+
+          {/* Transparency Note */}
+          <div className="mt-12 text-center">
+            <p className="text-text-secondary">
+              Fragen zum Datenschutz? Schreib uns: {' '}
+              <a href="mailto:datenschutz@ramboeck-it.com" className="text-primary hover:underline">
+                datenschutz@ramboeck-it.com
+              </a>
+            </p>
           </div>
         </div>
       </section>
