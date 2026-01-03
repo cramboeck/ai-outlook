@@ -75,6 +75,8 @@ export const useEmails = (enabled: boolean = true) => {
   return {
     emails: emailsQuery.data || [],
     isLoading: emailsQuery.isLoading,
+    isFetching: emailsQuery.isFetching,
+    isRefreshing: emailsQuery.isFetching && !emailsQuery.isLoading,
     isError: emailsQuery.isError,
     error: emailsQuery.error,
     refetch: emailsQuery.refetch,

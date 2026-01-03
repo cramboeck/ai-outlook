@@ -9,7 +9,7 @@ import { useClassify } from '../hooks/useClassify';
 import type { Email, Classification } from '../types';
 
 export const Inbox = () => {
-  const { emails, isLoading, refetch, getEmailBody, setCategoryAsync, setCategoriesBatchAsync } = useEmails();
+  const { emails, isLoading, isFetching, refetch, getEmailBody, setCategoryAsync, setCategoriesBatchAsync } = useEmails();
   const { classifyAsync, isClassifying, classifyBatchAsync } = useClassify();
 
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -120,7 +120,7 @@ export const Inbox = () => {
       {/* Email List */}
       <EmailList
         emails={emails}
-        isLoading={isLoading}
+        isLoading={isLoading || isFetching}
         onRefresh={refetch}
         onEmailSelect={setSelectedEmail}
         onClassify={handleClassifyEmail}
