@@ -83,3 +83,73 @@ export interface BatchClassifyRequest {
     sender: string;
   }>;
 }
+
+// ========== SMART FEATURES ==========
+
+// Insight Card für Dashboard
+export interface InsightCard {
+  id: string;
+  type: 'urgent' | 'action' | 'waiting' | 'finance' | 'meeting' | 'overdue';
+  title: string;
+  description: string;
+  count: number;
+  emailIds: string[];
+  icon: string;
+  color: string;
+  priority: number; // Für Sortierung
+}
+
+// Extrahierte Aktion aus E-Mail
+export interface ExtractedAction {
+  id: string;
+  emailId: string;
+  emailSubject: string;
+  action: string;
+  assignedTo?: string;
+  deadline?: string;
+  status: 'todo' | 'waiting' | 'done';
+  createdAt: string;
+  sender: string;
+}
+
+// Priority Score für E-Mail
+export interface EmailWithPriority extends Email {
+  priorityScore: number; // 0-100
+  priorityFactors: {
+    senderImportance: number;
+    contentUrgency: number;
+    hasDeadline: boolean;
+    isUnread: boolean;
+    ageHours: number;
+  };
+}
+
+// Smart View Definition
+export interface SmartView {
+  id: string;
+  name: string;
+  icon: string;
+  filter: (email: Email) => boolean;
+  count?: number;
+}
+
+// Weekly Briefing
+export interface WeeklyBriefing {
+  totalEmails: number;
+  answeredEmails: number;
+  pendingEmails: number;
+  topSenders: Array<{ name: string; count: number }>;
+  topCategories: Array<{ name: string; count: number }>;
+  urgentItems: string[];
+  weekOverWeekChange: number; // Prozent
+}
+
+// VIP Contact (auto-detected)
+export interface VIPContact {
+  email: string;
+  name: string;
+  avgResponseTimeMinutes: number;
+  emailCount: number;
+  lastContact: string;
+  importance: 'high' | 'medium';
+}
