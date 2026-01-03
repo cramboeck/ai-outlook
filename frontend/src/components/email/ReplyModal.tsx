@@ -104,26 +104,12 @@ export const ReplyModal = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Quick Actions */}
+          {/* Step 1: Tone Selection */}
           <div>
-            <h3 className="text-sm font-medium text-text-secondary mb-3">⚡ Schnellantwort</h3>
-            <div className="flex flex-wrap gap-2">
-              {QUICK_REPLIES.map((quick) => (
-                <button
-                  key={quick.intent}
-                  onClick={() => handleGenerate(quick.intent)}
-                  disabled={isGenerating}
-                  className="px-4 py-2 bg-white border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm font-medium disabled:opacity-50"
-                >
-                  {quick.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tone Selection */}
-          <div>
-            <h3 className="text-sm font-medium text-text-secondary mb-3">🎭 Tonalität</h3>
+            <h3 className="text-sm font-medium text-text mb-3">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-xs mr-2">1</span>
+              Tonalität wählen
+            </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {TONE_OPTIONS.map((option) => (
                 <button
@@ -131,7 +117,7 @@ export const ReplyModal = ({
                   onClick={() => setTone(option.value)}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     tone === option.value
-                      ? 'border-primary bg-primary/5'
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
                       : 'border-border hover:border-primary/50'
                   }`}
                 >
@@ -143,9 +129,35 @@ export const ReplyModal = ({
             </div>
           </div>
 
-          {/* Intent Selection */}
+          {/* Step 2: Quick Actions or Custom */}
           <div>
-            <h3 className="text-sm font-medium text-text-secondary mb-3">🎯 Absicht</h3>
+            <h3 className="text-sm font-medium text-text mb-3">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-xs mr-2">2</span>
+              Schnellantwort oder eigene Absicht
+            </h3>
+
+            {/* Quick Actions */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {QUICK_REPLIES.map((quick) => (
+                <button
+                  key={quick.intent}
+                  onClick={() => handleGenerate(quick.intent)}
+                  disabled={isGenerating}
+                  className="px-4 py-2.5 bg-gradient-to-r from-primary to-primary-dark text-white rounded-lg hover:opacity-90 transition-all text-sm font-medium disabled:opacity-50 shadow-sm"
+                >
+                  {quick.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-text-secondary">oder eigene Absicht wählen</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* Intent Selection */}
             <div className="flex flex-wrap gap-2">
               {INTENT_OPTIONS.map((option) => (
                 <button
