@@ -1,14 +1,17 @@
 import { useState } from 'react';
+import { useMsal } from '@azure/msal-react';
 import { Sparkles } from 'lucide-react';
 import { EmailList } from '../components/email/EmailList';
 import { ClassifyButton } from '../components/classification/ClassifyButton';
 import { ClassificationResult } from '../components/classification/ClassificationResult';
 import { BatchClassifyModal } from '../components/classification/BatchClassifyModal';
+import { ReplyModal } from '../components/email/ReplyModal';
 import { useEmails } from '../hooks/useEmails';
 import { useClassify } from '../hooks/useClassify';
 import type { Email, Classification } from '../types';
 
 export const Inbox = () => {
+  const { accounts } = useMsal();
   const { emails, isLoading, isFetching, refetch, getEmailBody, setCategoryAsync, setCategoriesBatchAsync } = useEmails();
   const { classifyAsync, isClassifying, classifyBatchAsync } = useClassify();
 
@@ -16,6 +19,13 @@ export const Inbox = () => {
   const [classificationResult, setClassificationResult] = useState<Classification | null>(null);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+
+  // Reply Modal State
+  const [replyEmail, setReplyEmail] = useState<Email | null>(null);
+  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+
+  const account = accounts[0];
+  const userName = account?.name || 'Freundliche Grüße';
 
   const uncategorizedEmails = emails.filter((e) => e.categories.length === 0);
 
@@ -66,6 +76,21 @@ export const Inbox = () => {
 
   const handleBatchApply = async (updates: Array<{ id: string; categories: string[] }>) => {
     await setCategoriesBatchAsync(updates);
+  };
+
+  const handleReplyClick = async (email: Email) => {
+    // Load full email body for better reply generation
+    const fullEmail = await getEmailBody(email.id);
+    setReplyEmail(fullEmail);
+    setIsReplyModalOpen(true);
+  };
+
+  const handleSendReply = (to: string, subject: string, body: string) => {
+    // Open Outlook compose window with pre-filled content
+    const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoUrl, '_blank');
+    setIsReplyModalOpen(false);
+    setReplyEmail(null);
   };
 
   return (
@@ -124,6 +149,7 @@ export const Inbox = () => {
         onRefresh={refetch}
         onEmailSelect={setSelectedEmail}
         onClassify={handleClassifyEmail}
+        onReply={handleReplyClick}
         selectedEmailId={selectedEmail?.id}
       />
 
@@ -135,6 +161,20 @@ export const Inbox = () => {
         onClassify={handleBatchClassify}
         onApply={handleBatchApply}
       />
+
+      {/* Reply Modal */}
+      {replyEmail && (
+        <ReplyModal
+          isOpen={isReplyModalOpen}
+          onClose={() => {
+            setIsReplyModalOpen(false);
+            setReplyEmail(null);
+          }}
+          email={replyEmail}
+          userName={userName}
+          onSendReply={handleSendReply}
+        />
+      )}
     </div>
   );
 };

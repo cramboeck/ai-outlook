@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from '../../utils/date';
-import { Paperclip, Star } from 'lucide-react';
+import { Paperclip, Star, Reply } from 'lucide-react';
 import { CategoryBadge } from './CategoryBadge';
 import type { Email } from '../../types';
 
@@ -8,9 +8,10 @@ interface EmailCardProps {
   isSelected?: boolean;
   onSelect?: (email: Email) => void;
   onClassify?: (email: Email) => void;
+  onReply?: (email: Email) => void;
 }
 
-export const EmailCard = ({ email, isSelected, onSelect, onClassify }: EmailCardProps) => {
+export const EmailCard = ({ email, isSelected, onSelect, onClassify, onReply }: EmailCardProps) => {
   const isUncategorized = email.categories.length === 0;
 
   return (
@@ -47,7 +48,7 @@ export const EmailCard = ({ email, isSelected, onSelect, onClassify }: EmailCard
             {email.bodyPreview}
           </p>
 
-          {/* Categories */}
+          {/* Categories & Actions */}
           <div className="flex items-center gap-2 mt-3">
             {email.categories.map((cat) => (
               <CategoryBadge key={cat} category={cat} size="sm" />
@@ -63,6 +64,16 @@ export const EmailCard = ({ email, isSelected, onSelect, onClassify }: EmailCard
                 + Kategorisieren
               </button>
             )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onReply?.(email);
+              }}
+              className="flex items-center gap-1 text-xs text-text-secondary hover:text-primary font-medium ml-auto"
+            >
+              <Reply className="w-3 h-3" />
+              KI-Antwort
+            </button>
           </div>
         </div>
 

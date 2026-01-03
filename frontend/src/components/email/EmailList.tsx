@@ -9,6 +9,7 @@ interface EmailListProps {
   onRefresh?: () => void;
   onEmailSelect?: (email: Email) => void;
   onClassify?: (email: Email) => void;
+  onReply?: (email: Email) => void;
   selectedEmailId?: string;
 }
 
@@ -20,6 +21,7 @@ export const EmailList = ({
   onRefresh,
   onEmailSelect,
   onClassify,
+  onReply,
   selectedEmailId,
 }: EmailListProps) => {
   const [filter, setFilter] = useState<FilterType>('all');
@@ -77,6 +79,7 @@ export const EmailList = ({
               isSelected={email.id === selectedEmailId}
               onSelect={onEmailSelect}
               onClassify={onClassify}
+              onReply={onReply}
             />
           ))}
         </div>
