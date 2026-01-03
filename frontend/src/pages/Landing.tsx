@@ -17,6 +17,9 @@ import {
   Star,
   Rocket,
   Play,
+  Building2,
+  Server,
+  Headphones,
 } from 'lucide-react';
 import { graphScopes } from '../config/msalConfig';
 
@@ -306,7 +309,7 @@ export const Landing = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 md:gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {/* Free Tier */}
           <div className="bg-white p-6 md:p-8 rounded-2xl border border-border">
             <h3 className="text-lg font-semibold text-text-secondary mb-2">Free</h3>
@@ -429,6 +432,47 @@ export const Landing = () => {
               Team starten
             </button>
           </div>
+
+          {/* Enterprise Tier */}
+          <div className="bg-gradient-to-br from-dark to-dark-light p-6 md:p-8 rounded-2xl border border-dark text-white">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Enterprise</h3>
+            </div>
+            <div className="mb-6">
+              <span className="text-2xl font-bold">Individuell</span>
+            </div>
+            <p className="text-white/70 mb-6">Self-Hosting & Custom Solutions</p>
+            <ul className="space-y-3 mb-8">
+              <li className="flex items-start gap-2">
+                <Server className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <span><strong>Self-Hosting</strong> in Ihrer Infrastruktur</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Lock className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <span><strong>DSGVO</strong> & Compliance ready</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Zap className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <span><strong>Custom</strong> Kategorien & Workflows</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Headphones className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <span><strong>Wartung</strong> & Support inkl.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Users className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <span>Onboarding & Schulung</span>
+              </li>
+            </ul>
+            <a
+              href="mailto:hello@ramboeck-it.com?subject=PostPilot%20Enterprise%20Anfrage"
+              className="w-full py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Anfrage senden
+            </a>
+          </div>
         </div>
       </section>
 
@@ -547,7 +591,7 @@ export const Landing = () => {
               <a href="https://ramboeck-it.com/kontakt" className="hover:text-primary transition-colors">Kontakt</a>
             </div>
             <p className="text-gray-400 text-sm">
-              © 2025 Ramböck IT. Made with ❤️ in Austria.
+              © 2025 Ramböck IT. Made with ❤️ and 🤖 in Bavaria.
             </p>
           </div>
         </div>
