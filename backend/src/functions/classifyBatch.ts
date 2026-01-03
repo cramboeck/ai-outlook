@@ -89,7 +89,7 @@ export async function classifyBatch(request: HttpRequest, context: InvocationCon
     }
 
     const client = getOpenAIClient();
-    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4.1-mini';
 
     // Format emails for the prompt
     const emailsText = body.emails
