@@ -35,12 +35,11 @@ export const ReplyModal = ({
 
   if (!isOpen) return null;
 
-  const handleGenerate = async (quickTone?: ReplyTone, quickIntent?: ReplyIntent) => {
+  const handleGenerate = async (quickIntent?: ReplyIntent) => {
     setIsGenerating(true);
     setError(null);
     setResult(null);
 
-    const useTone = quickTone || tone;
     const useIntent = quickIntent || intent;
 
     try {
@@ -50,7 +49,7 @@ export const ReplyModal = ({
         body: email.body?.content || email.bodyPreview,
         sender: email.from.emailAddress.address,
         senderName: email.from.emailAddress.name,
-        tone: useTone,
+        tone,
         intent: useIntent,
         customInstruction: useIntent === 'custom' ? customInstruction : undefined,
         userName,
@@ -58,7 +57,6 @@ export const ReplyModal = ({
 
       setResult(response);
       setEditedReply(response.reply);
-      setTone(useTone);
       setIntent(useIntent);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Generieren');
@@ -113,7 +111,7 @@ export const ReplyModal = ({
               {QUICK_REPLIES.map((quick) => (
                 <button
                   key={quick.intent}
-                  onClick={() => handleGenerate(quick.tone, quick.intent)}
+                  onClick={() => handleGenerate(quick.intent)}
                   disabled={isGenerating}
                   className="px-4 py-2 bg-white border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm font-medium disabled:opacity-50"
                 >
