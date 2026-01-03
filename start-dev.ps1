@@ -13,6 +13,22 @@ $rootDir = $PSScriptRoot
 Write-Host "Hole neueste Aenderungen..." -ForegroundColor Yellow
 git pull
 
+# Beende alte Prozesse auf den Ports
+Write-Host "Beende alte Server-Prozesse..." -ForegroundColor Yellow
+$port7071 = netstat -ano | Select-String ":7071.*LISTENING" | ForEach-Object { ($_ -split '\s+')[-1] } | Select-Object -First 1
+$port5173 = netstat -ano | Select-String ":5173.*LISTENING" | ForEach-Object { ($_ -split '\s+')[-1] } | Select-Object -First 1
+
+if ($port7071) {
+    Write-Host "  Beende Prozess auf Port 7071 (PID: $port7071)" -ForegroundColor Gray
+    taskkill /PID $port7071 /F 2>$null
+}
+if ($port5173) {
+    Write-Host "  Beende Prozess auf Port 5173 (PID: $port5173)" -ForegroundColor Gray
+    taskkill /PID $port5173 /F 2>$null
+}
+
+Start-Sleep -Seconds 1
+
 # Backend bauen
 Write-Host "Baue Backend..." -ForegroundColor Yellow
 Push-Location "$rootDir\backend"
