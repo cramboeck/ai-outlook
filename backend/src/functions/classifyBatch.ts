@@ -36,15 +36,17 @@ Kategorien:
 - "Finanzen": Rechnungen, Angebote, Bestellungen
 - "Intern": Interne Kommunikation, Team-Updates
 
-Antworte NUR mit einem JSON-Array:
-[
-  {
-    "id": "<email-id>",
-    "category": "<Kategoriename>",
-    "confidence": <0.0-1.0>,
-    "reasoning": "<Kurze Begründung, max 30 Wörter>"
-  }
-]
+Antworte NUR mit einem JSON-Objekt in diesem Format:
+{
+  "results": [
+    {
+      "id": "<email-id>",
+      "category": "<Kategoriename>",
+      "confidence": <0.0-1.0>,
+      "reasoning": "<Kurze Begründung, max 15 Wörter>"
+    }
+  ]
+}
 
 Regeln:
 1. Eine Kategorie pro E-Mail, basierend auf dem Hauptzweck
@@ -110,7 +112,7 @@ Inhalt: ${(email.body || email.subject).substring(0, 500)}
         { role: 'user', content: userMessage },
       ],
       temperature: 0.3,
-      max_tokens: 1000,
+      max_tokens: 4000,
       response_format: { type: 'json_object' },
     });
 
