@@ -145,7 +145,7 @@ export const Landing = () => {
             </div>
             <div className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-green-600" />
-              <span>Microsoft 365 zertifiziert</span>
+              <span>Für Microsoft 365</span>
             </div>
           </div>
         </div>
