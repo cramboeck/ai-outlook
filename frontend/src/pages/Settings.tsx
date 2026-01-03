@@ -8,7 +8,8 @@ export const Settings = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const existingCategoryNames = masterCategories.map((c) => c.name);
+  // Graph API returns 'displayName', not 'name'
+  const existingCategoryNames = masterCategories.map((c: any) => c.displayName || c.name);
   const missingCategories = CATEGORIES.filter((c) => !existingCategoryNames.includes(c.name));
 
   const handleSyncCategories = async () => {

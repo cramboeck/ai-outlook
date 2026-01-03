@@ -44,7 +44,8 @@ export const useCategories = () => {
   // Prüfe und erstelle fehlende MailSort-Kategorien
   const ensureMailSortCategories = async () => {
     const existing = categoriesQuery.data || [];
-    const existingNames = existing.map((c) => c.name);
+    // Graph API returns 'displayName', not 'name'
+    const existingNames = existing.map((c: any) => c.displayName || c.name);
 
     for (const category of CATEGORIES) {
       if (!existingNames.includes(category.name)) {
