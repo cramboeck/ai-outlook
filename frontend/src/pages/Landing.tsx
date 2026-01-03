@@ -54,14 +54,19 @@ export const Landing = () => {
       {/* Navigation */}
       <nav className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-100 z-50">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center">
               <Mail className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-text">PostPilot</span>
-            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-              BETA
-            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-text">PostPilot</span>
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                  BETA
+                </span>
+              </div>
+              <span className="text-xs text-text-secondary">by Ramböck IT</span>
+            </div>
           </div>
           <div className="hidden md:flex items-center gap-6">
             <a href="#features" className="text-text-secondary hover:text-text transition-colors">
@@ -137,7 +142,7 @@ export const Landing = () => {
       </section>
 
       {/* Problem Section */}
-      <section className="bg-gray-900 text-white py-16">
+      <section className="bg-dark text-white py-16">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
             Das E-Mail-Chaos kostet dich Zeit und Nerven
@@ -523,23 +528,26 @@ export const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-10">
+      <footer className="bg-dark text-white py-10">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                <Mail className="w-5 h-5" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                <Mail className="w-5 h-5 text-primary" />
               </div>
-              <span className="text-xl font-bold">PostPilot</span>
+              <div>
+                <span className="text-xl font-bold">PostPilot</span>
+                <p className="text-xs text-gray-400">by Ramböck IT</p>
+              </div>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-gray-400">
-              <a href="#" className="hover:text-white transition-colors">Impressum</a>
-              <a href="#" className="hover:text-white transition-colors">Datenschutz</a>
-              <a href="#" className="hover:text-white transition-colors">AGB</a>
-              <a href="#" className="hover:text-white transition-colors">Kontakt</a>
+              <a href="https://ramboeck-it.com/impressum" className="hover:text-primary transition-colors">Impressum</a>
+              <a href="https://ramboeck-it.com/datenschutz" className="hover:text-primary transition-colors">Datenschutz</a>
+              <a href="#" className="hover:text-primary transition-colors">AGB</a>
+              <a href="https://ramboeck-it.com/kontakt" className="hover:text-primary transition-colors">Kontakt</a>
             </div>
             <p className="text-gray-400 text-sm">
-              © 2025 PostPilot. Made in Germany.
+              © 2025 Ramböck IT. Made with ❤️ in Austria.
             </p>
           </div>
         </div>

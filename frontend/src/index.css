@@ -1,12 +1,22 @@
 @import "tailwindcss";
 
-/* MailSort Custom Theme */
+/* PostPilot by Ramböck IT - Custom Theme */
 @theme {
-  --color-primary: #0078d4;
-  --color-primary-dark: #106ebe;
+  /* Ramböck Corporate Colors */
+  --color-primary: #E87722;
+  --color-primary-dark: #D06820;
+  --color-primary-light: #F5923D;
+
+  /* Dark Theme Colors */
+  --color-dark: #1E1E1E;
+  --color-dark-light: #2D2D2D;
+
+  /* Status Colors */
   --color-success: #107c10;
   --color-warning: #ffb900;
   --color-error: #d13438;
+
+  /* UI Colors */
   --color-bg: #f5f5f5;
   --color-card: #ffffff;
   --color-border: #e1e1e1;
@@ -15,7 +25,7 @@
 
   /* Category Colors */
   --color-category-urgent: #d13438;
-  --color-category-action: #ff8c00;
+  --color-category-action: #E87722;
   --color-category-info: #107c10;
   --color-category-meeting: #0078d4;
   --color-category-finance: #8764b8;
