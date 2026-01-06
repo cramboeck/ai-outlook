@@ -25,14 +25,14 @@ export const getMe = async (): Promise<User> => {
   return await client.api('/me').select('id,displayName,mail,userPrincipalName').get();
 };
 
-// E-Mails laden
+// E-Mails laden (nur Posteingang)
 export const getEmails = async (
   top: number = 50,
   skip: number = 0
 ): Promise<{ value: Email[]; '@odata.nextLink'?: string }> => {
   const client = getGraphClient();
   return await client
-    .api('/me/messages')
+    .api('/me/mailFolders/inbox/messages')
     .select(
       'id,subject,bodyPreview,from,receivedDateTime,importance,categories,isRead,hasAttachments,conversationId'
     )
