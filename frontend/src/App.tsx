@@ -6,7 +6,7 @@ import { msalConfig } from './config/msalConfig';
 import { Layout } from './components/layout/Layout';
 import { Landing } from './pages/Landing';
 import { Dashboard } from './pages/Dashboard';
-import { Inbox } from './pages/Inbox';
+import { MailClient } from './pages/MailClient';
 import { Settings } from './pages/Settings';
 
 // Initialize MSAL
@@ -52,7 +52,8 @@ function App() {
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/inbox" element={<Inbox />} />
+              <Route path="/mail" element={<MailClient />} />
+              <Route path="/inbox" element={<Navigate to="/mail" replace />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
 

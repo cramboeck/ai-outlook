@@ -33,13 +33,14 @@ export const msalConfig: Configuration = {
 };
 
 export const loginRequest = {
-  scopes: ['User.Read', 'Mail.ReadWrite', 'MailboxSettings.ReadWrite'],
+  scopes: ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'MailboxSettings.ReadWrite'],
 };
 
 export const graphScopes = {
   scopes: [
     'https://graph.microsoft.com/User.Read',
     'https://graph.microsoft.com/Mail.ReadWrite',
+    'https://graph.microsoft.com/Mail.Send',
     'https://graph.microsoft.com/MailboxSettings.ReadWrite',
   ],
 };

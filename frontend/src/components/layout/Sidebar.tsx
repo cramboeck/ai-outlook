@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Inbox, Settings, X } from 'lucide-react';
+import { LayoutDashboard, Mail, Settings, X } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -8,7 +8,7 @@ interface SidebarProps {
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/inbox', icon: Inbox, label: 'Posteingang' },
+  { to: '/mail', icon: Mail, label: 'E-Mail' },
   { to: '/settings', icon: Settings, label: 'Einstellungen' },
 ];
 

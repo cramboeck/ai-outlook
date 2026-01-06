@@ -153,3 +153,49 @@ export interface VIPContact {
   lastContact: string;
   importance: 'high' | 'medium';
 }
+
+// ========== MAIL CLIENT ==========
+
+// Mail Folder from Graph API
+export interface MailFolder {
+  id: string;
+  displayName: string;
+  parentFolderId?: string;
+  childFolderCount: number;
+  unreadItemCount: number;
+  totalItemCount: number;
+  isHidden?: boolean;
+}
+
+// Well-known folder names
+export type WellKnownFolder =
+  | 'inbox'
+  | 'sentitems'
+  | 'drafts'
+  | 'deleteditems'
+  | 'archive'
+  | 'junkemail';
+
+// Send Email Request
+export interface SendEmailRequest {
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+  bodyType?: 'text' | 'html';
+  importance?: 'low' | 'normal' | 'high';
+  replyToMessageId?: string;
+}
+
+// Follow-up Reminder
+export interface FollowUpReminder {
+  id: string;
+  sentEmailId: string;
+  sentEmailSubject: string;
+  sentTo: string;
+  sentAt: string;
+  reminderDate: string;
+  status: 'pending' | 'replied' | 'dismissed';
+  conversationId: string;
+}
