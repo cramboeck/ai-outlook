@@ -1,0 +1,263 @@
+import { useState, useEffect } from 'react';
+import {
+  X,
+  Reply,
+  ReplyAll,
+  Forward,
+  Trash2,
+  Archive,
+  Star,
+  Paperclip,
+  Sparkles,
+  Loader2,
+  Clock,
+  User,
+  Calendar,
+} from 'lucide-react';
+import type { Email } from '../../types';
+import { getEmailWithBody, markEmailAsRead, deleteEmail } from '../../services/graphService';
+
+interface EmailDetailProps {
+  email: Email;
+  onClose: () => void;
+  onReply: (email: Email) => void;
+  onReplyAll?: (email: Email) => void;
+  onForward?: (email: Email) => void;
+  onClassify?: (email: Email) => void;
+  onDelete?: () => void;
+}
+
+export const EmailDetail = ({
+  email,
+  onClose,
+  onReply,
+  onReplyAll,
+  onForward,
+  onClassify,
+  onDelete,
+}: EmailDetailProps) => {
+  const [fullEmail, setFullEmail] = useState<Email | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadFullEmail();
+  }, [email.id]);
+
+  const loadFullEmail = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const emailWithBody = await getEmailWithBody(email.id);
+      setFullEmail(emailWithBody);
+
+      // Mark as read if unread
+      if (!email.isRead) {
+        await markEmailAsRead(email.id, true);
+      }
+    } catch (err) {
+      setError('E-Mail konnte nicht geladen werden');
+      console.error('Error loading email:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (confirm('E-Mail wirklich löschen?')) {
+      try {
+        await deleteEmail(email.id);
+        onDelete?.();
+        onClose();
+      } catch (err) {
+        console.error('Error deleting email:', err);
+      }
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('de-DE', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getCategoryColor = (category: string): string => {
+    const colors: Record<string, string> = {
+      'Dringend': 'bg-red-100 text-red-700',
+      'Aktion erforderlich': 'bg-orange-100 text-orange-700',
+      'Zur Info': 'bg-blue-100 text-blue-700',
+      'Meeting': 'bg-purple-100 text-purple-700',
+      'Finanzen': 'bg-green-100 text-green-700',
+      'Intern': 'bg-gray-100 text-gray-700',
+    };
+    return colors[category] || 'bg-gray-100 text-gray-700';
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white border-l border-border">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gray-50">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onReply(fullEmail || email)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+          >
+            <Reply className="w-4 h-4" />
+            Antworten
+          </button>
+          {onReplyAll && (
+            <button
+              onClick={() => onReplyAll(fullEmail || email)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <ReplyAll className="w-4 h-4" />
+            </button>
+          )}
+          {onForward && (
+            <button
+              onClick={() => onForward(fullEmail || email)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <Forward className="w-4 h-4" />
+            </button>
+          )}
+          {onClassify && (
+            <button
+              onClick={() => onClassify(fullEmail || email)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-primary text-primary rounded-lg hover:bg-primary/5 transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              KI
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDelete}
+            className="p-2 text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Löschen"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-2 text-text-secondary hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {isLoading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      ) : error ? (
+        <div className="flex-1 flex items-center justify-center text-red-500">
+          {error}
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          {/* Subject & Categories */}
+          <div className="px-6 py-4 border-b border-border">
+            <h1 className="text-xl font-semibold text-text mb-2">
+              {email.subject || '(Kein Betreff)'}
+            </h1>
+            {email.categories.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {email.categories.map((category) => (
+                  <span
+                    key={category}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(category)}`}
+                  >
+                    {category}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sender Info */}
+          <div className="px-6 py-4 border-b border-border">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-text">
+                      {email.from.emailAddress.name || email.from.emailAddress.address}
+                    </p>
+                    <p className="text-sm text-text-secondary">
+                      {email.from.emailAddress.address}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-text-secondary">
+                    <Calendar className="w-4 h-4" />
+                    {formatDate(email.receivedDateTime)}
+                  </div>
+                </div>
+                <p className="text-sm text-text-secondary mt-1">
+                  An: mich
+                </p>
+              </div>
+            </div>
+
+            {/* Attachments indicator */}
+            {email.hasAttachments && (
+              <div className="flex items-center gap-2 mt-3 text-sm text-text-secondary">
+                <Paperclip className="w-4 h-4" />
+                <span>Diese E-Mail enthält Anhänge</span>
+              </div>
+            )}
+
+            {/* Importance */}
+            {email.importance === 'high' && (
+              <div className="flex items-center gap-2 mt-2 text-sm text-red-600">
+                <Star className="w-4 h-4 fill-current" />
+                <span>Hohe Priorität</span>
+              </div>
+            )}
+          </div>
+
+          {/* Email Body */}
+          <div className="px-6 py-4">
+            {fullEmail?.body ? (
+              fullEmail.body.contentType === 'html' ? (
+                <div
+                  className="prose prose-sm max-w-none email-content"
+                  dangerouslySetInnerHTML={{ __html: fullEmail.body.content }}
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap font-sans text-sm text-text">
+                  {fullEmail.body.content}
+                </pre>
+              )
+            ) : (
+              <p className="text-text-secondary">{email.bodyPreview}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Footer with quick reply */}
+      <div className="border-t border-border p-4 bg-gray-50">
+        <button
+          onClick={() => onReply(fullEmail || email)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-border rounded-lg text-text-secondary hover:border-primary hover:text-primary transition-colors"
+        >
+          <Reply className="w-4 h-4" />
+          Klicken zum Antworten...
+        </button>
+      </div>
+    </div>
+  );
+};
