@@ -28,9 +28,19 @@ export function buildFolderHierarchy(
 ): FolderWithPath[] {
   const result: FolderWithPath[] = [];
 
-  const children = folders.filter(f =>
-    parentId ? f.parentFolderId === parentId : !f.parentFolderId
-  );
+  // Get all folder IDs to check if parentFolderId refers to a known folder
+  const folderIds = new Set(folders.map(f => f.id));
+
+  // For root level (no parentId), find folders whose parentFolderId is not in our list
+  // This handles cases where Graph API returns a root folder ID we don't have
+  const children = folders.filter(f => {
+    if (parentId) {
+      return f.parentFolderId === parentId;
+    } else {
+      // Top-level: either no parentFolderId or parentFolderId not in our list
+      return !f.parentFolderId || !folderIds.has(f.parentFolderId);
+    }
+  });
 
   for (const folder of children) {
     const path = parentPath ? `${parentPath}/${folder.displayName}` : folder.displayName;

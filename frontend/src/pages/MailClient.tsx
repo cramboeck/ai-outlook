@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, RefreshCw, Clock, Search, Settings } from 'lucide-react';
+import { Sparkles, RefreshCw, Clock, Search } from 'lucide-react';
 import { FolderSidebar } from '../components/mail/FolderSidebar';
 import { ComposeModal } from '../components/mail/ComposeModal';
 import { EmailDetail } from '../components/mail/EmailDetail';
@@ -11,7 +11,6 @@ import { ClassificationResult } from '../components/classification/Classificatio
 import { BatchClassifyModal } from '../components/classification/BatchClassifyModal';
 import { ReplyModal } from '../components/email/ReplyModal';
 import { SearchModal } from '../components/mail/SearchModal';
-import { SettingsModal } from '../components/settings/SettingsModal';
 import { useClassify } from '../hooks/useClassify';
 import {
   getEmailsFromFolder,
@@ -36,7 +35,6 @@ export const MailClient = () => {
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Email states
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -198,14 +196,6 @@ export const MailClient = () => {
               </button>
 
               <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-2 text-text-secondary hover:text-text hover:bg-gray-100 rounded-lg transition-colors"
-                title="Einstellungen"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-
-              <button
                 onClick={() => refetch()}
                 disabled={isFetching}
                 className="p-2 text-text-secondary hover:text-text hover:bg-gray-100 rounded-lg transition-colors"
@@ -320,12 +310,6 @@ export const MailClient = () => {
         isOpen={isSearchModalOpen}
         onClose={() => setIsSearchModalOpen(false)}
         onMoved={() => refetch()}
-      />
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
       />
     </div>
   );

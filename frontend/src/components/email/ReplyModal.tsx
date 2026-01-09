@@ -8,7 +8,7 @@ import {
   QUICK_REPLIES,
 } from '../../services/replyService';
 import type { ReplyTone, ReplyIntent, GenerateReplyResponse } from '../../services/replyService';
-import { getStoredSignature } from '../settings/SettingsModal';
+import { getStoredSignature } from '../../pages/Settings';
 
 interface ReplyModalProps {
   isOpen: boolean;

@@ -39,6 +39,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
   const [dateTo, setDateTo] = useState('');
   const [hasAttachments, setHasAttachments] = useState<boolean | undefined>(undefined);
   const [selectedSourceFolder, setSelectedSourceFolder] = useState('');
+  const [direction, setDirection] = useState<'all' | 'incoming' | 'outgoing'>('all');
 
   // Results state
   const [results, setResults] = useState<Email[]>([]);
@@ -78,7 +79,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
 
   const handleSearch = async () => {
     // At least one criterion required
-    if (!query && !from && !subject && !dateFrom && !dateTo && hasAttachments === undefined && !selectedSourceFolder) {
+    if (!query && !from && !subject && !dateFrom && !dateTo && hasAttachments === undefined && !selectedSourceFolder && direction === 'all') {
       setError('Bitte mindestens ein Suchkriterium angeben');
       return;
     }
@@ -102,7 +103,15 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
         criteria.dateTo = endDate.toISOString();
       }
       if (hasAttachments !== undefined) criteria.hasAttachments = hasAttachments;
-      if (selectedSourceFolder) criteria.folderId = selectedSourceFolder;
+
+      // Handle direction filter - use well-known folder names
+      if (direction === 'incoming') {
+        criteria.folderId = 'inbox';
+      } else if (direction === 'outgoing') {
+        criteria.folderId = 'sentitems';
+      } else if (selectedSourceFolder) {
+        criteria.folderId = selectedSourceFolder;
+      }
 
       const result = await searchEmails(criteria, 200);
       setResults(result.value);
@@ -172,6 +181,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
     setDateTo('');
     setHasAttachments(undefined);
     setSelectedSourceFolder('');
+    setDirection('all');
     setResults([]);
     setSelectedIds(new Set());
     setHasSearched(false);
@@ -310,27 +320,68 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
               </div>
             </div>
 
-            {/* Source Folder */}
+            {/* Direction filter */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1">
-                Quellordner (optional)
+                Richtung
               </label>
-              <select
-                value={selectedSourceFolder}
-                onChange={(e) => setSelectedSourceFolder(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                disabled={isLoadingFolders}
-              >
-                <option value="">Alle Ordner</option>
-                {folders
-                  .filter((f) => !f.isHidden)
-                  .map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {'  '.repeat(folder.depth)}{folder.displayName}
-                    </option>
-                  ))}
-              </select>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="direction"
+                    checked={direction === 'all'}
+                    onChange={() => { setDirection('all'); setSelectedSourceFolder(''); }}
+                    className="text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm">Alle</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="direction"
+                    checked={direction === 'incoming'}
+                    onChange={() => { setDirection('incoming'); setSelectedSourceFolder(''); }}
+                    className="text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm">Eingehend</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="direction"
+                    checked={direction === 'outgoing'}
+                    onChange={() => { setDirection('outgoing'); setSelectedSourceFolder(''); }}
+                    className="text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm">Ausgehend</span>
+                </label>
+              </div>
             </div>
+
+            {/* Source Folder - only show when direction is 'all' */}
+            {direction === 'all' && (
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Quellordner (optional)
+                </label>
+                <select
+                  value={selectedSourceFolder}
+                  onChange={(e) => setSelectedSourceFolder(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  disabled={isLoadingFolders}
+                >
+                  <option value="">Alle Ordner</option>
+                  {folders
+                    .filter((f) => !f.isHidden)
+                    .map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {'  '.repeat(folder.depth)}{folder.displayName}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
 
             {/* Attachments filter */}
             <div>
