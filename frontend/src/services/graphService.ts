@@ -315,67 +315,98 @@ export const searchEmails = async (
 ): Promise<{ value: Email[] }> => {
   const client = getGraphClient();
 
-  // Build filter parts
-  const filters: string[] = [];
+  const hasTextSearch = criteria.query || criteria.subject || criteria.from;
 
-  if (criteria.from) {
-    // Search by sender - can't use $filter on from, use $search
-  }
-
-  if (criteria.dateFrom) {
-    filters.push(`receivedDateTime ge ${criteria.dateFrom}`);
-  }
-
-  if (criteria.dateTo) {
-    filters.push(`receivedDateTime le ${criteria.dateTo}`);
-  }
-
-  if (criteria.hasAttachments !== undefined) {
-    filters.push(`hasAttachments eq ${criteria.hasAttachments}`);
-  }
-
-  if (criteria.isRead !== undefined) {
-    filters.push(`isRead eq ${criteria.isRead}`);
-  }
-
-  // Build the request
+  // Build the request - endpoint based on folder selection
   const endpoint = criteria.folderId
     ? `/me/mailFolders/${criteria.folderId}/messages`
     : '/me/messages';
 
-  let request = client
-    .api(endpoint)
-    .select(
-      'id,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,importance,categories,isRead,hasAttachments,conversationId,parentFolderId'
-    )
-    .top(top)
-    .orderby('receivedDateTime desc');
+  const selectFields = 'id,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,importance,categories,isRead,hasAttachments,conversationId,parentFolderId';
 
-  // Apply filter if we have any
-  if (filters.length > 0) {
-    request = request.filter(filters.join(' and '));
-  }
+  let results: Email[] = [];
 
-  // Use $search for text queries (subject, from, body)
-  if (criteria.query || criteria.subject || criteria.from) {
+  if (hasTextSearch) {
+    // Use $search for text queries - can't combine with $filter or $orderby
     const searchParts: string[] = [];
 
     if (criteria.query) {
       searchParts.push(`"${criteria.query}"`);
     }
     if (criteria.subject) {
-      searchParts.push(`subject:${criteria.subject}`);
+      searchParts.push(`"${criteria.subject}"`);
     }
     if (criteria.from) {
-      searchParts.push(`from:${criteria.from}`);
+      searchParts.push(`"${criteria.from}"`);
     }
 
-    // Note: $search requires ConsistencyLevel: eventual header
-    request = request.header('ConsistencyLevel', 'eventual');
-    request = request.search(searchParts.join(' AND '));
+    const searchQuery = searchParts.join(' ');
+
+    const response = await client
+      .api(endpoint)
+      .header('ConsistencyLevel', 'eventual')
+      .search(searchQuery)
+      .select(selectFields)
+      .top(top)
+      .get();
+
+    results = response.value || [];
+
+    // Apply additional filters client-side since $search can't combine with $filter
+    if (criteria.dateFrom) {
+      const dateFrom = new Date(criteria.dateFrom);
+      results = results.filter(e => new Date(e.receivedDateTime) >= dateFrom);
+    }
+    if (criteria.dateTo) {
+      const dateTo = new Date(criteria.dateTo);
+      dateTo.setHours(23, 59, 59, 999);
+      results = results.filter(e => new Date(e.receivedDateTime) <= dateTo);
+    }
+    if (criteria.hasAttachments !== undefined) {
+      results = results.filter(e => e.hasAttachments === criteria.hasAttachments);
+    }
+    if (criteria.isRead !== undefined) {
+      results = results.filter(e => e.isRead === criteria.isRead);
+    }
+
+    // Sort by date (since $orderby can't be used with $search)
+    results.sort((a, b) =>
+      new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime()
+    );
+  } else {
+    // No text search - use $filter and $orderby
+    const filters: string[] = [];
+
+    if (criteria.dateFrom) {
+      filters.push(`receivedDateTime ge ${criteria.dateFrom}`);
+    }
+    if (criteria.dateTo) {
+      const dateTo = new Date(criteria.dateTo);
+      dateTo.setHours(23, 59, 59, 999);
+      filters.push(`receivedDateTime le ${dateTo.toISOString()}`);
+    }
+    if (criteria.hasAttachments !== undefined) {
+      filters.push(`hasAttachments eq ${criteria.hasAttachments}`);
+    }
+    if (criteria.isRead !== undefined) {
+      filters.push(`isRead eq ${criteria.isRead}`);
+    }
+
+    let request = client
+      .api(endpoint)
+      .select(selectFields)
+      .top(top)
+      .orderby('receivedDateTime desc');
+
+    if (filters.length > 0) {
+      request = request.filter(filters.join(' and '));
+    }
+
+    const response = await request.get();
+    results = response.value || [];
   }
 
-  return await request.get();
+  return { value: results };
 };
 
 // Mehrere E-Mails verschieben (Batch)
