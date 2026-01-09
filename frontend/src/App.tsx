@@ -8,6 +8,11 @@ import { Landing } from './pages/Landing';
 import { Dashboard } from './pages/Dashboard';
 import { MailClient } from './pages/MailClient';
 import { Settings } from './pages/Settings';
+import { AdminConsent } from './pages/AdminConsent';
+import { Onboarding } from './pages/Onboarding';
+import { ToastProvider } from './components/ui/Toast';
+import { Privacy } from './pages/Privacy';
+import { Terms } from './pages/Terms';
 
 // Initialize MSAL
 const msalInstance = new PublicClientApplication(msalConfig);
@@ -38,10 +43,28 @@ function App() {
   return (
     <MsalProvider instance={msalInstance}>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Routes>
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
             {/* Public landing page */}
             <Route path="/" element={<Landing />} />
+
+            {/* Admin consent callback (public) */}
+            <Route path="/admin-consent" element={<AdminConsent />} />
+
+            {/* Legal pages (public) */}
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+
+            {/* Onboarding (protected, no layout) */}
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <Onboarding />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Protected routes with layout */}
             <Route
@@ -59,8 +82,9 @@ function App() {
 
             {/* Fallback redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
       </QueryClientProvider>
     </MsalProvider>
   );

@@ -1,15 +1,25 @@
 import type { Configuration } from '@azure/msal-browser';
 import { LogLevel } from '@azure/msal-browser';
 
+// Multi-tenant: Use 'organizations' for work/school accounts only
+// Use 'common' to also allow personal Microsoft accounts
+const authority = import.meta.env.VITE_MSAL_TENANT_ID
+  ? `https://login.microsoftonline.com/${import.meta.env.VITE_MSAL_TENANT_ID}`
+  : 'https://login.microsoftonline.com/organizations';
+
 export const msalConfig: Configuration = {
   auth: {
     clientId: import.meta.env.VITE_MSAL_CLIENT_ID || '',
-    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_MSAL_TENANT_ID || 'common'}`,
+    authority,
     redirectUri: window.location.origin,
     postLogoutRedirectUri: window.location.origin,
+    // Required for multi-tenant apps
+    knownAuthorities: ['login.microsoftonline.com'],
+    // Navigate to requesting page after login
+    navigateToLoginRequestUrl: true,
   },
   cache: {
-    cacheLocation: 'sessionStorage',
+    cacheLocation: 'localStorage', // Use localStorage for better persistence across tabs
     storeAuthStateInCookie: false,
   },
   system: {
@@ -30,6 +40,20 @@ export const msalConfig: Configuration = {
       },
     },
   },
+};
+
+// Helper to get the client ID
+export const getClientId = (): string => {
+  return import.meta.env.VITE_MSAL_CLIENT_ID || '';
+};
+
+// Admin consent URL generator for tenant admins
+export const getAdminConsentUrl = (redirectUri?: string): string => {
+  const clientId = getClientId();
+  const redirect = redirectUri || `${window.location.origin}/admin-consent`;
+  const scopes = graphScopes.scopes.join(' ');
+
+  return `https://login.microsoftonline.com/organizations/v2.0/adminconsent?client_id=${clientId}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(redirect)}`;
 };
 
 export const loginRequest = {

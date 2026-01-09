@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import {
   Sparkles,
@@ -27,7 +27,7 @@ import {
   XCircle,
   ArrowRight,
 } from 'lucide-react';
-import { graphScopes } from '../config/msalConfig';
+import { graphScopes, getAdminConsentUrl } from '../config/msalConfig';
 
 export const Landing = () => {
   const navigate = useNavigate();
@@ -39,7 +39,7 @@ export const Landing = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate('/onboarding');
     }
   }, [isAuthenticated, navigate]);
 
@@ -83,6 +83,9 @@ export const Landing = () => {
             </a>
             <a href="#pricing" className="text-text-secondary hover:text-text transition-colors">
               Preise
+            </a>
+            <a href="#admin" className="text-text-secondary hover:text-text transition-colors">
+              Für Unternehmen
             </a>
             <a href="#security" className="text-text-secondary hover:text-text transition-colors">
               Sicherheit
@@ -490,6 +493,92 @@ export const Landing = () => {
         </div>
       </section>
 
+      {/* IT Admin Section */}
+      <section id="admin" className="bg-white py-16 border-t border-border">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
+              <Building2 className="w-4 h-4" />
+              Für IT-Administratoren
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-text mb-4">
+              PostPilot für Ihr Unternehmen freigeben
+            </h2>
+            <p className="text-lg text-text-secondary max-w-2xl mx-auto">
+              Als IT-Admin können Sie PostPilot zentral für alle Mitarbeiter Ihrer Organisation freigeben.
+              Nach einmaliger Genehmigung können sich alle Benutzer selbstständig anmelden.
+            </p>
+          </div>
+
+          <div className="bg-gray-50 rounded-2xl p-6 md:p-8 border border-border">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="font-semibold text-text mb-4 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-green-600" />
+                  Was wird genehmigt?
+                </h3>
+                <ul className="space-y-3 text-text-secondary">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-1" />
+                    <span><strong>Lesen</strong> von E-Mails und Ordnern</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-1" />
+                    <span><strong>Kategorisieren</strong> und Verschieben von E-Mails</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-1" />
+                    <span><strong>Senden</strong> von Antworten im Namen des Benutzers</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-1" />
+                    <span><strong>Lesen</strong> von Postfach-Einstellungen</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-text mb-4 flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-blue-600" />
+                  Sicherheit & Kontrolle
+                </h3>
+                <ul className="space-y-3 text-text-secondary">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-1" />
+                    <span>Jeder Benutzer greift nur auf <strong>eigene</strong> E-Mails zu</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-1" />
+                    <span>Zugriff jederzeit im <strong>Azure Portal</strong> widerrufbar</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-1" />
+                    <span><strong>Keine</strong> E-Mail-Speicherung auf unseren Servern</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-1" />
+                    <span>AVV für <strong>DSGVO</strong>-Compliance auf Anfrage</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-border text-center">
+              <a
+                href={getAdminConsentUrl()}
+                className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white rounded-xl hover:bg-primary-dark transition-all shadow-lg hover:shadow-xl text-lg font-medium"
+              >
+                <Building2 className="w-5 h-5" />
+                Admin Consent erteilen
+              </a>
+              <p className="text-sm text-text-secondary mt-4">
+                Sie werden zu Microsoft weitergeleitet, um die Berechtigungen für Ihre Organisation zu genehmigen.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Beta Signup Section */}
       <section className="bg-gradient-to-br from-primary to-primary-dark py-16">
         <div className="max-w-2xl mx-auto px-4 text-center">
@@ -767,8 +856,8 @@ export const Landing = () => {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-gray-400">
               <a href="https://ramboeck-it.com/impressum" className="hover:text-primary transition-colors">Impressum</a>
-              <a href="https://ramboeck-it.com/datenschutz" className="hover:text-primary transition-colors">Datenschutz</a>
-              <a href="#" className="hover:text-primary transition-colors">AGB</a>
+              <Link to="/privacy" className="hover:text-primary transition-colors">Datenschutz</Link>
+              <Link to="/terms" className="hover:text-primary transition-colors">AGB</Link>
               <a href="https://ramboeck-it.com/kontakt" className="hover:text-primary transition-colors">Kontakt</a>
             </div>
             <p className="text-gray-400 text-sm">
