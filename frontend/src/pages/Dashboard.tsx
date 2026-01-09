@@ -15,7 +15,7 @@ import type { InsightCard, SmartView } from '../types';
 export const Dashboard = () => {
   const { accounts } = useMsal();
   const navigate = useNavigate();
-  const { emails, isLoading } = useEmails();
+  const { emails, isLoading, refetch } = useEmails();
   const { stats } = useEmailStats();
   const { insights } = useInsights(emails);
   const smartViews = useSmartViews(emails);
@@ -43,10 +43,6 @@ export const Dashboard = () => {
     } else {
       setActiveView(view.id);
     }
-  };
-
-  const handleEmailClick = (emailId: string) => {
-    navigate('/inbox', { state: { selectedEmailId: emailId } });
   };
 
   return (
@@ -89,7 +85,7 @@ export const Dashboard = () => {
         <WeeklyBriefing emails={emails} />
 
         {/* Right: Action Board */}
-        <ActionBoard emails={emails} onEmailClick={handleEmailClick} />
+        <ActionBoard emails={emails} onRefresh={refetch} />
       </div>
 
       {/* Stats */}
@@ -104,6 +100,7 @@ export const Dashboard = () => {
       <RecentActivity
         emails={activeView ? filteredEmails : emails}
         title={activeView ? smartViews.find((v) => v.id === activeView)?.name : undefined}
+        onRefresh={refetch}
       />
     </div>
   );

@@ -14,11 +14,13 @@ import {
   Mail,
   ChevronDown,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import type { Email } from '../../types';
 import {
   searchEmails,
   moveEmailsBatch,
+  deleteEmailsBatch,
   getMailFolders,
   type SearchCriteria,
 } from '../../services/graphService';
@@ -53,8 +55,10 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
   const [selectedDestFolder, setSelectedDestFolder] = useState('');
   const [showFolderPicker, setShowFolderPicker] = useState(false);
 
-  // Moving state
+  // Moving/Deleting state
   const [isMoving, setIsMoving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -170,6 +174,34 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
       setError('Verschieben fehlgeschlagen');
     } finally {
       setIsMoving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (selectedIds.size === 0) {
+      setError('Keine E-Mails ausgewählt');
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      setError(null);
+      setSuccess(null);
+      setShowDeleteConfirm(false);
+
+      await deleteEmailsBatch(Array.from(selectedIds));
+
+      // Remove deleted emails from results
+      setResults((prev) => prev.filter((e) => !selectedIds.has(e.id)));
+      const deletedCount = selectedIds.size;
+      setSelectedIds(new Set());
+      setSuccess(`${deletedCount} E-Mail(s) erfolgreich gelöscht`);
+      onMoved(); // Refresh parent view
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setError('Löschen fehlgeschlagen');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -533,7 +565,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                   {/* Move button */}
                   <button
                     onClick={handleMove}
-                    disabled={isMoving || !selectedDestFolder}
+                    disabled={isMoving || isDeleting || !selectedDestFolder}
                     className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
                   >
                     {isMoving ? (
@@ -543,6 +575,45 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                     )}
                     Verschieben ({selectedIds.size})
                   </button>
+
+                  {/* Delete button */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowDeleteConfirm(!showDeleteConfirm)}
+                      disabled={isMoving || isDeleting}
+                      className="flex items-center gap-2 px-4 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm"
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                      Löschen
+                    </button>
+
+                    {/* Delete confirmation dropdown */}
+                    {showDeleteConfirm && (
+                      <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-border rounded-lg shadow-lg z-50 p-4">
+                        <p className="text-sm text-text mb-3">
+                          <strong>{selectedIds.size} E-Mail(s)</strong> wirklich löschen?
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            className="flex-1 px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            Abbrechen
+                          </button>
+                          <button
+                            onClick={handleDelete}
+                            className="flex-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            Ja, löschen
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

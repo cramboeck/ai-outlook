@@ -260,6 +260,24 @@ export const deleteEmail = async (messageId: string): Promise<void> => {
   await client.api(`/me/messages/${messageId}`).delete();
 };
 
+// E-Mails in Batch löschen
+export const deleteEmailsBatch = async (messageIds: string[]): Promise<void> => {
+  const client = getGraphClient();
+
+  // Graph API batch requests (max 20 per batch)
+  const batchSize = 20;
+  for (let i = 0; i < messageIds.length; i += batchSize) {
+    const batch = messageIds.slice(i, i + batchSize);
+    const requests = batch.map((id, index) => ({
+      id: String(index + 1),
+      method: 'DELETE',
+      url: `/me/messages/${id}`,
+    }));
+
+    await client.api('/$batch').post({ requests });
+  }
+};
+
 // E-Mail als gelesen/ungelesen markieren
 export const markEmailAsRead = async (
   messageId: string,
