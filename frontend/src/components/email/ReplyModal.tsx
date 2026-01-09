@@ -8,6 +8,7 @@ import {
   QUICK_REPLIES,
 } from '../../services/replyService';
 import type { ReplyTone, ReplyIntent, GenerateReplyResponse } from '../../services/replyService';
+import { getStoredSignature } from '../settings/SettingsModal';
 
 interface ReplyModalProps {
   isOpen: boolean;
@@ -56,7 +57,14 @@ export const ReplyModal = ({
       });
 
       setResult(response);
-      setEditedReply(response.reply);
+
+      // Append signature if configured
+      const signature = getStoredSignature();
+      const replyWithSignature = signature
+        ? `${response.reply}\n\n${signature}`
+        : response.reply;
+
+      setEditedReply(replyWithSignature);
       setIntent(useIntent);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Generieren');
