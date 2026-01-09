@@ -15,7 +15,7 @@ import {
   ChevronDown,
   AlertCircle,
 } from 'lucide-react';
-import type { Email, MailFolder } from '../../types';
+import type { Email } from '../../types';
 import {
   searchEmails,
   moveEmailsBatch,

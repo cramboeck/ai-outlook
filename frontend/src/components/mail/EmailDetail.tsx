@@ -5,14 +5,12 @@ import {
   ReplyAll,
   Forward,
   Trash2,
-  Archive,
-  Star,
   Paperclip,
   Sparkles,
   Loader2,
-  Clock,
   User,
   Calendar,
+  Star,
 } from 'lucide-react';
 import type { Email } from '../../types';
 import { getEmailWithBody, markEmailAsRead, deleteEmail } from '../../services/graphService';

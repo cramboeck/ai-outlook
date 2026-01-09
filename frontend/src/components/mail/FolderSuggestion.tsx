@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FolderInput, Check, X, Loader2, ChevronDown, Sparkles } from 'lucide-react';
-import type { Email, MailFolder } from '../../types';
+import type { Email } from '../../types';
 import { suggestFolder, buildFolderHierarchy, type FolderWithPath, type FolderSuggestion as FolderSuggestionType } from '../../services/folderService';
 import { moveEmail, getMailFolders } from '../../services/graphService';
 
@@ -168,7 +168,7 @@ export const FolderSuggestion = ({ email, onMoved }: FolderSuggestionProps) => {
       {suggestion.alternativeFolders.length > 0 && (
         <div className="mt-2 flex items-center gap-2 text-xs text-blue-600">
           <span>Alternativen:</span>
-          {suggestion.alternativeFolders.map((alt, i) => (
+          {suggestion.alternativeFolders.map((alt) => (
             <button
               key={alt.folderId}
               onClick={() => handleMove(alt.folderId)}

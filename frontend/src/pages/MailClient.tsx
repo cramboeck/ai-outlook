@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { useQuery } from '@tanstack/react-query';
 import { Sparkles, RefreshCw, Clock, Search } from 'lucide-react';

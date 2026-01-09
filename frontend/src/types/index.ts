@@ -13,12 +13,20 @@ export interface Email {
       address: string;
     };
   };
+  toRecipients?: Array<{
+    emailAddress: {
+      name: string;
+      address: string;
+    };
+  }>;
+  sentDateTime?: string;
   receivedDateTime: string;
   importance: 'low' | 'normal' | 'high';
   categories: string[];
   isRead: boolean;
   hasAttachments: boolean;
   conversationId: string;
+  parentFolderId?: string;
 }
 
 // Klassifizierungsergebnis von Azure Function
