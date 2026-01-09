@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { Email } from '../../types';
 import { getEmailWithBody, markEmailAsRead, deleteEmail } from '../../services/graphService';
+import { FolderSuggestion } from './FolderSuggestion';
 
 interface EmailDetailProps {
   email: Email;
@@ -25,6 +26,8 @@ interface EmailDetailProps {
   onForward?: (email: Email) => void;
   onClassify?: (email: Email) => void;
   onDelete?: () => void;
+  onMoved?: () => void;
+  showFolderSuggestion?: boolean;
 }
 
 export const EmailDetail = ({
@@ -35,6 +38,8 @@ export const EmailDetail = ({
   onForward,
   onClassify,
   onDelete,
+  onMoved,
+  showFolderSuggestion = true,
 }: EmailDetailProps) => {
   const [fullEmail, setFullEmail] = useState<Email | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -153,6 +158,17 @@ export const EmailDetail = ({
           </button>
         </div>
       </div>
+
+      {/* Folder Suggestion - Only show for inbox emails that aren't categorized */}
+      {showFolderSuggestion && !isLoading && fullEmail && email.categories.length === 0 && (
+        <FolderSuggestion
+          email={email}
+          onMoved={() => {
+            onMoved?.();
+            onClose();
+          }}
+        />
+      )}
 
       {/* Content */}
       {isLoading ? (

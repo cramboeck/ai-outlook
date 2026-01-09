@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, RefreshCw, Clock } from 'lucide-react';
+import { Sparkles, RefreshCw, Clock, Search } from 'lucide-react';
 import { FolderSidebar } from '../components/mail/FolderSidebar';
 import { ComposeModal } from '../components/mail/ComposeModal';
 import { EmailDetail } from '../components/mail/EmailDetail';
@@ -10,6 +10,7 @@ import { ClassifyButton } from '../components/classification/ClassifyButton';
 import { ClassificationResult } from '../components/classification/ClassificationResult';
 import { BatchClassifyModal } from '../components/classification/BatchClassifyModal';
 import { ReplyModal } from '../components/email/ReplyModal';
+import { SearchModal } from '../components/mail/SearchModal';
 import { useClassify } from '../hooks/useClassify';
 import {
   getEmailsFromFolder,
@@ -33,6 +34,7 @@ export const MailClient = () => {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   // Email states
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -186,6 +188,14 @@ export const MailClient = () => {
 
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setIsSearchModalOpen(true)}
+                className="p-2 text-text-secondary hover:text-text hover:bg-gray-100 rounded-lg transition-colors"
+                title="E-Mails suchen & verschieben"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+
+              <button
                 onClick={() => refetch()}
                 disabled={isFetching}
                 className="p-2 text-text-secondary hover:text-text hover:bg-gray-100 rounded-lg transition-colors"
@@ -256,6 +266,11 @@ export const MailClient = () => {
             onReply={handleReplyClick}
             onClassify={!isSentFolder && !isFollowUp ? handleClassifyEmail : undefined}
             onDelete={() => refetch()}
+            onMoved={() => {
+              refetch();
+              setSelectedEmail(null);
+            }}
+            showFolderSuggestion={!isSentFolder && !isFollowUp}
           />
         </div>
       )}
@@ -289,6 +304,13 @@ export const MailClient = () => {
           onSendReply={handleSendReply}
         />
       )}
+
+      {/* Search Modal */}
+      <SearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        onMoved={() => refetch()}
+      />
     </div>
   );
 };

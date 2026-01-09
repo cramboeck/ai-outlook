@@ -114,14 +114,45 @@ export const filterByCategory = (emails: Email[], category: string): Email[] => 
 
 // ========== MAIL CLIENT FUNCTIONS ==========
 
-// Mail-Ordner laden
+// Mail-Ordner laden (inkl. Unterordner)
 export const getMailFolders = async (): Promise<{ value: MailFolder[] }> => {
   const client = getGraphClient();
-  return await client
+  const result = await client
     .api('/me/mailFolders')
     .select('id,displayName,parentFolderId,childFolderCount,unreadItemCount,totalItemCount,isHidden')
-    .top(50)
+    .top(100)
     .get();
+
+  // Load child folders recursively
+  const allFolders: MailFolder[] = [...result.value];
+
+  const loadChildFolders = async (parentId: string) => {
+    try {
+      const children = await client
+        .api(`/me/mailFolders/${parentId}/childFolders`)
+        .select('id,displayName,parentFolderId,childFolderCount,unreadItemCount,totalItemCount,isHidden')
+        .top(50)
+        .get();
+
+      for (const child of children.value) {
+        allFolders.push(child);
+        if (child.childFolderCount > 0) {
+          await loadChildFolders(child.id);
+        }
+      }
+    } catch {
+      // Ignore errors for child folders
+    }
+  };
+
+  // Load children for folders that have them
+  for (const folder of result.value) {
+    if (folder.childFolderCount > 0) {
+      await loadChildFolders(folder.id);
+    }
+  }
+
+  return { value: allFolders };
 };
 
 // E-Mails aus beliebigem Ordner laden
@@ -264,6 +295,116 @@ export const createDraft = async (
 export const sendDraft = async (messageId: string): Promise<void> => {
   const client = getGraphClient();
   await client.api(`/me/messages/${messageId}/send`).post({});
+};
+
+// E-Mails suchen mit Kriterien
+export interface SearchCriteria {
+  query?: string; // Free text search
+  from?: string; // Sender email or name
+  subject?: string; // Subject contains
+  dateFrom?: string; // ISO date string
+  dateTo?: string; // ISO date string
+  hasAttachments?: boolean;
+  isRead?: boolean;
+  folderId?: string; // Search in specific folder
+}
+
+export const searchEmails = async (
+  criteria: SearchCriteria,
+  top: number = 100
+): Promise<{ value: Email[] }> => {
+  const client = getGraphClient();
+
+  // Build filter parts
+  const filters: string[] = [];
+
+  if (criteria.from) {
+    // Search by sender - can't use $filter on from, use $search
+  }
+
+  if (criteria.dateFrom) {
+    filters.push(`receivedDateTime ge ${criteria.dateFrom}`);
+  }
+
+  if (criteria.dateTo) {
+    filters.push(`receivedDateTime le ${criteria.dateTo}`);
+  }
+
+  if (criteria.hasAttachments !== undefined) {
+    filters.push(`hasAttachments eq ${criteria.hasAttachments}`);
+  }
+
+  if (criteria.isRead !== undefined) {
+    filters.push(`isRead eq ${criteria.isRead}`);
+  }
+
+  // Build the request
+  const endpoint = criteria.folderId
+    ? `/me/mailFolders/${criteria.folderId}/messages`
+    : '/me/messages';
+
+  let request = client
+    .api(endpoint)
+    .select(
+      'id,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,importance,categories,isRead,hasAttachments,conversationId,parentFolderId'
+    )
+    .top(top)
+    .orderby('receivedDateTime desc');
+
+  // Apply filter if we have any
+  if (filters.length > 0) {
+    request = request.filter(filters.join(' and '));
+  }
+
+  // Use $search for text queries (subject, from, body)
+  if (criteria.query || criteria.subject || criteria.from) {
+    const searchParts: string[] = [];
+
+    if (criteria.query) {
+      searchParts.push(`"${criteria.query}"`);
+    }
+    if (criteria.subject) {
+      searchParts.push(`subject:${criteria.subject}`);
+    }
+    if (criteria.from) {
+      searchParts.push(`from:${criteria.from}`);
+    }
+
+    // Note: $search requires ConsistencyLevel: eventual header
+    request = request.header('ConsistencyLevel', 'eventual');
+    request = request.search(searchParts.join(' AND '));
+  }
+
+  return await request.get();
+};
+
+// Mehrere E-Mails verschieben (Batch)
+export const moveEmailsBatch = async (
+  messageIds: string[],
+  destinationFolderId: string
+): Promise<void> => {
+  const client = getGraphClient();
+
+  // Graph API Batch Request (max 20 per batch)
+  const batchSize = 20;
+  for (let i = 0; i < messageIds.length; i += batchSize) {
+    const batch = messageIds.slice(i, i + batchSize);
+    const batchRequest = {
+      requests: batch.map((id, index) => ({
+        id: `${index}`,
+        method: 'POST',
+        url: `/me/messages/${id}/move`,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: {
+          destinationId: destinationFolderId,
+        },
+      })),
+    };
+
+    await client.api('/$batch').post(batchRequest);
+  }
 };
 
 // Gesendete E-Mails ohne Antwort finden (für Follow-up)
