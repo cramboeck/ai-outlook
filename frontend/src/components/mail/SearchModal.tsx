@@ -3,7 +3,7 @@ import {
   X,
   Search,
   Filter,
-  FolderInput,
+  Folder,
   Check,
   CheckSquare,
   Square,
@@ -497,35 +497,36 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Results Header */}
           {hasSearched && (
-            <div className="px-6 py-3 border-b border-border bg-white flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleSelectAll}
-                  className="flex items-center gap-2 text-sm text-text-secondary hover:text-text transition-colors"
-                >
-                  {selectedIds.size === results.length && results.length > 0 ? (
-                    <CheckSquare className="w-4 h-4 text-primary" />
-                  ) : (
-                    <Square className="w-4 h-4" />
-                  )}
-                  Alle auswählen
-                </button>
-                <span className="text-sm text-text-secondary">
-                  {results.length} Ergebnis(se)
-                  {selectedIds.size > 0 && ` · ${selectedIds.size} ausgewählt`}
-                </span>
-              </div>
+            <div className="px-6 py-3 border-b border-border bg-white">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleSelectAll}
+                    className="flex items-center gap-2 text-sm text-text-secondary hover:text-text transition-colors"
+                  >
+                    {selectedIds.size === results.length && results.length > 0 ? (
+                      <CheckSquare className="w-4 h-4 text-primary" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                    Alle auswählen
+                  </button>
+                  <span className="text-sm text-text-secondary">
+                    {results.length} Ergebnis(se)
+                    {selectedIds.size > 0 && ` · ${selectedIds.size} ausgewählt`}
+                  </span>
+                </div>
 
-              {/* Move controls */}
-              {selectedIds.size > 0 && (
-                <div className="flex items-center gap-3">
+                {/* Move/Delete controls */}
+                {selectedIds.size > 0 && (
+                  <div className="flex items-center gap-2">
                   {/* Folder picker */}
                   <div className="relative">
                     <button
                       onClick={() => setShowFolderPicker(!showFolderPicker)}
                       className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-lg hover:bg-gray-50 transition-colors text-sm"
                     >
-                      <FolderInput className="w-4 h-4 text-text-secondary" />
+                      <Folder className="w-4 h-4 text-text-secondary" />
                       <span className="max-w-[200px] truncate">{getDestFolderName()}</span>
                       <ChevronDown className="w-4 h-4 text-text-secondary" />
                     </button>
@@ -550,7 +551,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                                 }`}
                                 style={{ paddingLeft: `${12 + folder.depth * 16}px` }}
                               >
-                                <FolderInput className="w-4 h-4 flex-shrink-0" />
+                                <Folder className="w-4 h-4 flex-shrink-0" />
                                 <span className="truncate">{folder.displayName}</span>
                                 {selectedDestFolder === folder.id && (
                                   <Check className="w-4 h-4 ml-auto" />
@@ -571,7 +572,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                     {isMoving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <FolderInput className="w-4 h-4" />
+                      <Folder className="w-4 h-4" />
                     )}
                     Verschieben ({selectedIds.size})
                   </button>
@@ -616,6 +617,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           )}
 
@@ -664,7 +666,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                       {!selectedSourceFolder && email.parentFolderId && (
                         <div className="mt-1">
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs text-text-secondary">
-                            <FolderInput className="w-3 h-3" />
+                            <Folder className="w-3 h-3" />
                             {folders.find((f) => f.id === email.parentFolderId)?.path || 'Unbekannt'}
                           </span>
                         </div>

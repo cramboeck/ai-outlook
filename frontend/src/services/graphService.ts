@@ -315,6 +315,18 @@ export const sendDraft = async (messageId: string): Promise<void> => {
   await client.api(`/me/messages/${messageId}/send`).post({});
 };
 
+// Resolve well-known folder name to actual folder ID
+export const resolveWellKnownFolder = async (wellKnownName: string): Promise<string> => {
+  const client = getGraphClient();
+  try {
+    const folder = await client.api(`/me/mailFolders/${wellKnownName}`).select('id').get();
+    return folder.id;
+  } catch {
+    // Return the original name if resolution fails
+    return wellKnownName;
+  }
+};
+
 // E-Mails suchen mit Kriterien
 export interface SearchCriteria {
   query?: string; // Free text search
@@ -335,9 +347,15 @@ export const searchEmails = async (
 
   const hasTextSearch = criteria.query || criteria.subject || criteria.from;
 
+  // Resolve well-known folder names to actual folder IDs
+  let resolvedFolderId = criteria.folderId;
+  if (criteria.folderId === 'inbox' || criteria.folderId === 'sentitems') {
+    resolvedFolderId = await resolveWellKnownFolder(criteria.folderId);
+  }
+
   // Build the request - endpoint based on folder selection
-  const endpoint = criteria.folderId
-    ? `/me/mailFolders/${criteria.folderId}/messages`
+  const endpoint = resolvedFolderId
+    ? `/me/mailFolders/${resolvedFolderId}/messages`
     : '/me/messages';
 
   const selectFields = 'id,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,importance,categories,isRead,hasAttachments,conversationId,parentFolderId';
