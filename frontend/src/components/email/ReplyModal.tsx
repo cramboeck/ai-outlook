@@ -292,7 +292,7 @@ export const ReplyModal = ({
                   className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
                 >
                   <Send className="w-4 h-4" />
-                  In Outlook öffnen
+                  Antwort senden
                 </button>
               )}
             </div>
