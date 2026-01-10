@@ -13,6 +13,11 @@ import {
   RotateCcw,
   ChevronDown,
   X,
+  Sun,
+  Moon,
+  Monitor,
+  Type,
+  LayoutList,
 } from 'lucide-react';
 import { CATEGORIES, getPresetCssColor } from '../config/categories';
 import { useCategories } from '../hooks/useCategories';
@@ -26,6 +31,13 @@ import {
   AVAILABLE_PRESETS,
   AVAILABLE_EMOJIS,
 } from '../services/categoryService';
+import {
+  getDisplaySettings,
+  saveDisplaySettings,
+  type DisplaySettings,
+  type ThemeMode,
+  type FontSize,
+} from '../services/themeService';
 
 const SIGNATURE_STORAGE_KEY = 'postpilot_signature';
 
@@ -246,6 +258,9 @@ export const Settings = () => {
   const [showPreview, setShowPreview] = useState(true);
   const [signatureSaved, setSignatureSaved] = useState(false);
 
+  // Display settings state
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(getDisplaySettings);
+
   // Load categories on mount
   useEffect(() => {
     const config = getCustomCategoryConfig();
@@ -276,6 +291,16 @@ export const Settings = () => {
     localStorage.removeItem(SIGNATURE_STORAGE_KEY);
     setSignatureSaved(true);
     setTimeout(() => setSignatureSaved(false), 2000);
+  };
+
+  // Display settings handlers
+  const updateDisplaySetting = <K extends keyof DisplaySettings>(
+    key: K,
+    value: DisplaySettings[K]
+  ) => {
+    const newSettings = { ...displaySettings, [key]: value };
+    setDisplaySettings(newSettings);
+    saveDisplaySettings(newSettings);
   };
 
   const handleToggleCustomCategories = (enabled: boolean) => {
@@ -370,6 +395,108 @@ export const Settings = () => {
       <div>
         <h1 className="text-2xl font-bold text-text">Einstellungen</h1>
         <p className="text-text-secondary">Verwalten Sie Ihre PostPilot Konfiguration</p>
+      </div>
+
+      {/* Display Settings Section */}
+      <div className="bg-white rounded-xl border border-border">
+        <div className="px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Monitor className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-text">Darstellung</h2>
+          </div>
+          <p className="text-sm text-text-secondary">
+            Theme, Schriftgröße und Ansichtsoptionen
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Theme Selection */}
+          <div>
+            <label className="block text-sm font-medium text-text mb-3">
+              Farbschema
+            </label>
+            <div className="flex gap-2">
+              {([
+                { value: 'light' as ThemeMode, icon: Sun, label: 'Hell' },
+                { value: 'dark' as ThemeMode, icon: Moon, label: 'Dunkel' },
+                { value: 'system' as ThemeMode, icon: Monitor, label: 'System' },
+              ]).map(({ value, icon: Icon, label }) => (
+                <button
+                  key={value}
+                  onClick={() => updateDisplaySetting('theme', value)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${
+                    displaySettings.theme === value
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-text-secondary hover:border-primary/50 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-sm font-medium">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Font Size Selection */}
+          <div>
+            <label className="block text-sm font-medium text-text mb-3">
+              <Type className="w-4 h-4 inline mr-2" />
+              Schriftgröße
+            </label>
+            <div className="flex gap-2">
+              {([
+                { value: 'small' as FontSize, label: 'Klein', sample: 'Aa' },
+                { value: 'medium' as FontSize, label: 'Mittel', sample: 'Aa' },
+                { value: 'large' as FontSize, label: 'Groß', sample: 'Aa' },
+              ]).map(({ value, label, sample }) => (
+                <button
+                  key={value}
+                  onClick={() => updateDisplaySetting('fontSize', value)}
+                  className={`flex flex-col items-center gap-1 px-4 py-3 rounded-lg border transition-all min-w-[80px] ${
+                    displaySettings.fontSize === value
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-text-secondary hover:border-primary/50 hover:bg-gray-50'
+                  }`}
+                >
+                  <span
+                    className="font-medium"
+                    style={{
+                      fontSize: value === 'small' ? '12px' : value === 'medium' ? '14px' : '16px',
+                    }}
+                  >
+                    {sample}
+                  </span>
+                  <span className="text-xs">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Compact View Toggle */}
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center gap-3">
+              <LayoutList className="w-5 h-5 text-text-secondary" />
+              <div>
+                <p className="font-medium text-text">Kompakte Ansicht</p>
+                <p className="text-sm text-text-secondary">
+                  Reduzierte Abstände und keine E-Mail-Vorschau
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => updateDisplaySetting('compactView', !displaySettings.compactView)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                displaySettings.compactView ? 'bg-primary' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                  displaySettings.compactView ? 'left-7' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Categories Section */}

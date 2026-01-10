@@ -18,7 +18,7 @@ export const EmailCard = ({ email, isSelected, onSelect, onClassify, onReply }: 
     <div
       onClick={() => onSelect?.(email)}
       className={`
-        bg-white border rounded-lg p-4 cursor-pointer transition-all
+        email-item bg-white border rounded-lg p-4 cursor-pointer transition-all
         ${isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-gray-300'}
         ${!email.isRead ? 'border-l-4 border-l-primary' : ''}
       `}
@@ -39,12 +39,12 @@ export const EmailCard = ({ email, isSelected, onSelect, onClassify, onReply }: 
           </div>
 
           {/* Subject */}
-          <h3 className={`text-base truncate mb-1 ${!email.isRead ? 'font-medium text-text' : 'text-text'}`}>
+          <h3 className={`email-subject text-base truncate mb-1 ${!email.isRead ? 'font-medium text-text' : 'text-text'}`}>
             {email.subject || '(Kein Betreff)'}
           </h3>
 
           {/* Preview */}
-          <p className="text-sm text-text-secondary line-clamp-2">
+          <p className="email-preview text-sm text-text-secondary line-clamp-2">
             {email.bodyPreview}
           </p>
 
