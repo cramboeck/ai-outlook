@@ -1,11 +1,16 @@
-import { useState } from 'react';
-import { Loader2, Sparkles, Calendar, Reply, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Loader2, Sparkles, Calendar, Reply, Trash2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import type { Email } from '../../types';
 import { extractActions, getPriorityColor, getTypeIcon, getTypeLabel } from '../../services/actionService';
 import type { ExtractedAction } from '../../services/actionService';
 import { prepareBodyForClassification } from '../../services/classifyService';
 import { getEmailWithBody, replyToEmail, deleteEmail } from '../../services/graphService';
 import { ReplyModal } from '../email/ReplyModal';
+import {
+  getCachedActions,
+  cacheActions,
+  removeEmailFromActionCache,
+} from '../../services/actionCacheService';
 
 interface ActionBoardProps {
   emails: Email[];
@@ -18,31 +23,63 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasExtracted, setHasExtracted] = useState(false);
+  const [isFromCache, setIsFromCache] = useState(false);
 
   // Email detail state
   const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
-  const [fullEmail, setFullEmail] = useState<Email | null>(null);
+  const [emailCache, setEmailCache] = useState<Map<string, Email>>(new Map());
   const [isLoadingBody, setIsLoadingBody] = useState(false);
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const [replyEmail, setReplyEmail] = useState<Email | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleExtractActions = async () => {
+  // Get relevant emails
+  const relevantEmails = emails.filter((e) =>
+    e.categories.some((c) =>
+      ['Aktion erforderlich', 'Dringend', 'Meeting', 'Finanzen'].includes(c)
+    )
+  );
+  const relevantEmailIds = relevantEmails.map((e) => e.id);
+
+  // Load cached actions on mount/when emails change
+  useEffect(() => {
+    if (relevantEmailIds.length === 0) return;
+
+    const cached = getCachedActions(relevantEmailIds);
+    if (cached && cached.length > 0) {
+      // Filter out actions for emails that no longer exist
+      const validActions = cached.filter((a) =>
+        emails.some((e) => e.id === a.emailId)
+      );
+      if (validActions.length > 0) {
+        setActions(validActions);
+        setHasExtracted(true);
+        setIsFromCache(true);
+      }
+    }
+  }, [emails.length]); // Re-check when email count changes
+
+  const handleExtractActions = async (forceRefresh = false) => {
     setIsLoading(true);
     setError(null);
+    setIsFromCache(false);
 
     try {
-      // Nur kategorisierte E-Mails mit "Aktion erforderlich", "Dringend", "Meeting", "Finanzen"
-      const relevantEmails = emails.filter((e) =>
-        e.categories.some((c) =>
-          ['Aktion erforderlich', 'Dringend', 'Meeting', 'Finanzen'].includes(c)
-        )
-      );
-
       if (relevantEmails.length === 0) {
         setActions([]);
         setHasExtracted(true);
         return;
+      }
+
+      // Check cache first (unless force refresh)
+      if (!forceRefresh) {
+        const cached = getCachedActions(relevantEmailIds);
+        if (cached && cached.length > 0) {
+          setActions(cached);
+          setHasExtracted(true);
+          setIsFromCache(true);
+          return;
+        }
       }
 
       // Max 20 Emails
@@ -58,6 +95,10 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
       }));
 
       const result = await extractActions(emailsToProcess);
+
+      // Cache the results
+      cacheActions(relevantEmailIds, result.actions);
+
       setActions(result.actions);
       setHasExtracted(true);
     } catch (err) {
@@ -67,29 +108,46 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
     }
   };
 
-  const handleActionClick = async (action: ExtractedAction) => {
+  const handleRefreshActions = () => {
+    handleExtractActions(true);
+  };
+
+  const handleActionClick = useCallback(async (action: ExtractedAction) => {
     if (expandedEmailId === action.emailId) {
       setExpandedEmailId(null);
-      setFullEmail(null);
       return;
     }
 
     setExpandedEmailId(action.emailId);
+
+    // Check if already cached
+    if (emailCache.has(action.emailId)) {
+      return;
+    }
+
     setIsLoadingBody(true);
     try {
       const full = await getEmailWithBody(action.emailId);
-      setFullEmail(full);
+      setEmailCache((prev) => new Map(prev).set(action.emailId, full));
     } catch (err) {
       console.error('Failed to load email body:', err);
     } finally {
       setIsLoadingBody(false);
     }
+  }, [expandedEmailId, emailCache]);
+
+  const getFullEmail = (emailId: string): Email | null => {
+    return emailCache.get(emailId) || null;
   };
 
   const handleReplyClick = async (emailId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const full = fullEmail?.id === emailId ? fullEmail : await getEmailWithBody(emailId);
+      let full = emailCache.get(emailId);
+      if (!full) {
+        full = await getEmailWithBody(emailId);
+        setEmailCache((prev) => new Map(prev).set(emailId, full!));
+      }
       setReplyEmail(full);
       setIsReplyModalOpen(true);
     } catch (err) {
@@ -119,12 +177,18 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
     setDeletingId(emailId);
     try {
       await deleteEmail(emailId);
-      // Remove action from list
+      // Remove action from list and cache
       setActions((prev) => prev.filter((a) => a.emailId !== emailId));
+      removeEmailFromActionCache(emailId);
       if (expandedEmailId === emailId) {
         setExpandedEmailId(null);
-        setFullEmail(null);
       }
+      // Remove from email cache
+      setEmailCache((prev) => {
+        const next = new Map(prev);
+        next.delete(emailId);
+        return next;
+      });
       onRefresh?.();
     } catch (err) {
       console.error('Failed to delete email:', err);
@@ -133,14 +197,7 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
     }
   };
 
-  // Nicht genug relevante Emails
-  const relevantCount = emails.filter((e) =>
-    e.categories.some((c) =>
-      ['Aktion erforderlich', 'Dringend', 'Meeting', 'Finanzen'].includes(c)
-    )
-  ).length;
-
-  if (relevantCount === 0 && !hasExtracted) {
+  if (relevantEmails.length === 0 && !hasExtracted) {
     return (
       <div className="bg-white border border-border rounded-xl p-6 text-center">
         <span className="text-4xl mb-3 block">📋</span>
@@ -162,24 +219,36 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
             </h2>
             <p className="text-sm text-text-secondary">
               {hasExtracted
-                ? `${actions.length} Aktionen erkannt`
-                : `${relevantCount} relevante Mails`}
+                ? `${actions.length} Aktionen${isFromCache ? ' (gecached)' : ''}`
+                : `${relevantEmails.length} relevante Mails`}
             </p>
           </div>
-          {!hasExtracted && (
-            <button
-              onClick={handleExtractActions}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
-              Aktionen erkennen
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {hasExtracted && (
+              <button
+                onClick={handleRefreshActions}
+                disabled={isLoading}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-text-secondary hover:text-text hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                title="Aktionen neu laden"
+              >
+                <RotateCcw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+            {!hasExtracted && (
+              <button
+                onClick={() => handleExtractActions(false)}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                Aktionen erkennen
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
@@ -204,9 +273,10 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
             {actions.map((action, index) => {
               const email = emails.find((e) => e.id === action.emailId);
               const isExpanded = expandedEmailId === action.emailId;
+              const fullEmail = getFullEmail(action.emailId);
 
               return (
-                <div key={index}>
+                <div key={`${action.emailId}-${index}`}>
                   <div
                     className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
                       isExpanded ? 'bg-gray-50' : ''
@@ -235,7 +305,7 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
                         <p className="font-medium text-text">{action.action}</p>
                         {email && (
                           <p className="text-sm text-text-secondary truncate mt-1">
-                            Von: {email.from.emailAddress.name} - {email.subject}
+                            Von: {email.from.emailAddress.name || email.from.emailAddress.address} - {email.subject}
                           </p>
                         )}
                         {action.deadline && (
@@ -256,7 +326,7 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
                   {/* Expanded Email Detail */}
                   {isExpanded && (
                     <div className="px-4 pb-4 bg-gray-50">
-                      {isLoadingBody ? (
+                      {isLoadingBody && !fullEmail ? (
                         <div className="flex items-center justify-center py-8">
                           <Loader2 className="w-6 h-6 text-primary animate-spin" />
                         </div>
@@ -286,17 +356,25 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
                           </div>
 
                           {/* Email Body Preview */}
-                          <div className="bg-white rounded-lg border border-border p-4 max-h-48 overflow-y-auto">
+                          <div className="bg-white rounded-lg border border-border p-4 max-h-64 overflow-y-auto">
                             <div
                               className="email-content text-sm text-text"
                               dangerouslySetInnerHTML={{
-                                __html: fullEmail.body?.content || fullEmail.bodyPreview || '',
+                                __html: fullEmail.body?.content || fullEmail.bodyPreview || 'Kein Inhalt verfügbar',
                               }}
                             />
                           </div>
                         </div>
                       ) : (
-                        <p className="text-text-secondary text-sm py-4">E-Mail konnte nicht geladen werden.</p>
+                        <div className="py-4">
+                          <p className="text-text-secondary text-sm">E-Mail konnte nicht geladen werden.</p>
+                          <button
+                            onClick={() => handleActionClick(action)}
+                            className="text-sm text-primary hover:text-primary-dark mt-2"
+                          >
+                            Erneut versuchen
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
