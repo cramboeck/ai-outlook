@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMsal } from '@azure/msal-react';
 import { graphScopes } from '../config/msalConfig';
 import { initGraphClient, getMasterCategories, createMasterCategory } from '../services/graphService';
-import { CATEGORIES } from '../config/categories';
+import { getActiveCategories } from '../services/categoryService';
 
 export const useCategories = () => {
   const { instance, accounts } = useMsal();
@@ -41,13 +41,16 @@ export const useCategories = () => {
     },
   });
 
-  // Prüfe und erstelle fehlende MailSort-Kategorien
+  // Prüfe und erstelle fehlende MailSort-Kategorien (uses active categories - default or custom)
   const ensureMailSortCategories = async () => {
     const existing = categoriesQuery.data || [];
     // Graph API returns 'displayName', not 'name'
     const existingNames = existing.map((c: any) => c.displayName || c.name);
 
-    for (const category of CATEGORIES) {
+    // Use active categories (custom if enabled, otherwise defaults)
+    const activeCategories = getActiveCategories();
+
+    for (const category of activeCategories) {
       if (!existingNames.includes(category.name)) {
         try {
           await createCategoryMutation.mutateAsync({
@@ -74,6 +77,6 @@ export const useCategories = () => {
     createCategory: createCategoryMutation.mutate,
     isCreating: createCategoryMutation.isPending,
     ensureMailSortCategories,
-    mailSortCategories: CATEGORIES,
+    mailSortCategories: getActiveCategories(),
   };
 };

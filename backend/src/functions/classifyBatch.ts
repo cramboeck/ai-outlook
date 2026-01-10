@@ -1,6 +1,12 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { AzureOpenAI } from 'openai';
 
+interface CategoryDefinition {
+  name: string;
+  description: string;
+  keywords?: string[];
+}
+
 interface EmailInput {
   id: string;
   subject: string;
@@ -10,6 +16,7 @@ interface EmailInput {
 
 interface BatchClassifyRequest {
   emails: EmailInput[];
+  categories?: CategoryDefinition[]; // Custom categories from frontend
 }
 
 interface ClassificationResult {
@@ -25,16 +32,32 @@ interface BatchClassifyResponse {
   processingTimeMs: number;
 }
 
-const SYSTEM_PROMPT = `Du bist ein E-Mail-Klassifizierungs-Assistent für ein deutschsprachiges Unternehmen.
+const DEFAULT_CATEGORIES: CategoryDefinition[] = [
+  { name: 'Dringend', description: 'Zeitkritische Anfragen, Eskalationen, Notfälle' },
+  { name: 'Aktion erforderlich', description: 'Aufgaben die Antwort oder Handlung erfordern' },
+  { name: 'Zur Info', description: 'Newsletter, CC-Mails, automatische Benachrichtigungen' },
+  { name: 'Meeting', description: 'Terminanfragen, Einladungen, Besprechungen' },
+  { name: 'Finanzen', description: 'Rechnungen, Angebote, Bestellungen' },
+  { name: 'Intern', description: 'Interne Kommunikation, Team-Updates' },
+];
+
+function buildBatchSystemPrompt(categories: CategoryDefinition[]): string {
+  const categoryList = categories.map(c => {
+    let entry = `- "${c.name}": ${c.description}`;
+    if (c.keywords && c.keywords.length > 0) {
+      entry += ` (Keywords: ${c.keywords.join(', ')})`;
+    }
+    return entry;
+  }).join('\n');
+
+  const categoryNames = categories.map(c => c.name);
+  const priorityOrder = categoryNames.slice(0, Math.min(6, categoryNames.length)).join(' > ');
+
+  return `Du bist ein E-Mail-Klassifizierungs-Assistent für ein deutschsprachiges Unternehmen.
 Du erhältst mehrere E-Mails und klassifizierst jede einzeln.
 
 Kategorien:
-- "Dringend": Zeitkritische Anfragen, Eskalationen, Notfälle
-- "Aktion erforderlich": Aufgaben die Antwort oder Handlung erfordern
-- "Zur Info": Newsletter, CC-Mails, automatische Benachrichtigungen
-- "Meeting": Terminanfragen, Einladungen, Besprechungen
-- "Finanzen": Rechnungen, Angebote, Bestellungen
-- "Intern": Interne Kommunikation, Team-Updates
+${categoryList}
 
 Antworte NUR mit einem JSON-Objekt in diesem Format:
 {
@@ -50,8 +73,9 @@ Antworte NUR mit einem JSON-Objekt in diesem Format:
 
 Regeln:
 1. Eine Kategorie pro E-Mail, basierend auf dem Hauptzweck
-2. Bei Unsicherheit: Dringend > Aktion > Meeting > Finanzen > Intern > Info
-3. Newsletter und System-Mails sind "Zur Info"`;
+2. Bei Unsicherheit: ${priorityOrder}
+3. Newsletter und System-Mails gehören zu Info-Kategorien`;
+}
 
 function getOpenAIClient(): AzureOpenAI {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
@@ -93,6 +117,13 @@ export async function classifyBatch(request: HttpRequest, context: InvocationCon
     const client = getOpenAIClient();
     const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4.1-mini';
 
+    // Use custom categories if provided, otherwise use defaults
+    const categories = body.categories && body.categories.length > 0
+      ? body.categories
+      : DEFAULT_CATEGORIES;
+
+    const systemPrompt = buildBatchSystemPrompt(categories);
+
     // Format emails for the prompt
     const emailsText = body.emails
       .map((email, index) => `
@@ -108,7 +139,7 @@ Inhalt: ${(email.body || email.subject).substring(0, 500)}
     const response = await client.chat.completions.create({
       model: deployment,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.3,

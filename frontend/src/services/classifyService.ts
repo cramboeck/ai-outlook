@@ -1,6 +1,16 @@
 import type { Classification, BatchClassificationResult, ClassifyRequest, BatchClassifyRequest } from '../types';
+import { getActiveCategories } from './categoryService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7071/api';
+
+// Convert Category to CategoryDefinition for API
+const getCategoriesForApi = () => {
+  return getActiveCategories().map(cat => ({
+    name: cat.name,
+    description: cat.description,
+    keywords: cat.keywords,
+  }));
+};
 
 export const classifyEmail = async (request: ClassifyRequest): Promise<Classification> => {
   const response = await fetch(`${API_URL}/classify`, {
@@ -8,7 +18,10 @@ export const classifyEmail = async (request: ClassifyRequest): Promise<Classific
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify({
+      ...request,
+      categories: getCategoriesForApi(),
+    }),
   });
 
   if (!response.ok) {
@@ -27,7 +40,10 @@ export const classifyEmailBatch = async (
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify({
+      ...request,
+      categories: getCategoriesForApi(),
+    }),
   });
 
   if (!response.ok) {

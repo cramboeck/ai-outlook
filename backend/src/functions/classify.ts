@@ -1,12 +1,19 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { AzureOpenAI } from 'openai';
 
+interface CategoryDefinition {
+  name: string;
+  description: string;
+  keywords?: string[];
+}
+
 interface ClassifyRequest {
   subject: string;
   body: string;
   sender: string;
   receivedDateTime: string;
   importance: string;
+  categories?: CategoryDefinition[]; // Custom categories from frontend
 }
 
 interface ClassifyResponse {
@@ -16,15 +23,31 @@ interface ClassifyResponse {
   suggestedAction?: string;
 }
 
-const SYSTEM_PROMPT = `Du bist ein E-Mail-Klassifizierungs-Assistent für ein deutschsprachiges Unternehmen.
+const DEFAULT_CATEGORIES: CategoryDefinition[] = [
+  { name: 'Dringend', description: 'Zeitkritische Anfragen, Eskalationen, Notfälle, ASAP' },
+  { name: 'Aktion erforderlich', description: 'Aufgaben die eine Antwort oder Handlung erfordern' },
+  { name: 'Zur Info', description: 'Newsletter, CC-Mails, automatische Benachrichtigungen, FYI' },
+  { name: 'Meeting', description: 'Terminanfragen, Einladungen, Besprechungen, Calls' },
+  { name: 'Finanzen', description: 'Rechnungen, Angebote, Bestellungen, Buchhaltung' },
+  { name: 'Intern', description: 'Interne Kommunikation, Team-Updates, HR' },
+];
+
+function buildSystemPrompt(categories: CategoryDefinition[]): string {
+  const categoryList = categories.map(c => {
+    let entry = `- "${c.name}": ${c.description}`;
+    if (c.keywords && c.keywords.length > 0) {
+      entry += ` (Keywords: ${c.keywords.join(', ')})`;
+    }
+    return entry;
+  }).join('\n');
+
+  const categoryNames = categories.map(c => c.name);
+  const priorityOrder = categoryNames.slice(0, Math.min(6, categoryNames.length)).join(' > ');
+
+  return `Du bist ein E-Mail-Klassifizierungs-Assistent für ein deutschsprachiges Unternehmen.
 Analysiere die E-Mail und ordne sie GENAU EINER der folgenden Kategorien zu:
 
-- "Dringend": Zeitkritische Anfragen, Eskalationen, Notfälle, ASAP
-- "Aktion erforderlich": Aufgaben die eine Antwort oder Handlung erfordern
-- "Zur Info": Newsletter, CC-Mails, automatische Benachrichtigungen, FYI
-- "Meeting": Terminanfragen, Einladungen, Besprechungen, Calls
-- "Finanzen": Rechnungen, Angebote, Bestellungen, Buchhaltung
-- "Intern": Interne Kommunikation, Team-Updates, HR
+${categoryList}
 
 Antworte NUR mit einem JSON-Objekt:
 {
@@ -36,11 +59,12 @@ Antworte NUR mit einem JSON-Objekt:
 
 Regeln:
 1. Wähle die EINE passendste Kategorie basierend auf dem Hauptzweck
-2. Bei Unsicherheit, wähle nach Priorität: Dringend > Aktion > Meeting > Finanzen > Intern > Info
-3. Automatische System-Mails und Newsletter sind "Zur Info"
-4. E-Mails die explizit eine Antwort fordern sind "Aktion erforderlich"
+2. Bei Unsicherheit, wähle nach Priorität: ${priorityOrder}
+3. Automatische System-Mails und Newsletter gehören zu Info-Kategorien
+4. E-Mails die explizit eine Antwort fordern gehören zu Aktions-Kategorien
 5. Confidence: <0.5 = unsicher, >0.8 = sehr sicher
-6. suggestedAction nur bei "Dringend" oder "Aktion erforderlich" angeben`;
+6. suggestedAction nur bei dringenden oder aktionsrelevanten Kategorien angeben`;
+}
 
 function getOpenAIClient(): AzureOpenAI {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
@@ -73,6 +97,13 @@ export async function classify(request: HttpRequest, context: InvocationContext)
     const client = getOpenAIClient();
     const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4.1-mini';
 
+    // Use custom categories if provided, otherwise use defaults
+    const categories = body.categories && body.categories.length > 0
+      ? body.categories
+      : DEFAULT_CATEGORIES;
+
+    const systemPrompt = buildSystemPrompt(categories);
+
     const userMessage = `
 Betreff: ${body.subject || '(Kein Betreff)'}
 Von: ${body.sender || 'Unbekannt'}
@@ -86,7 +117,7 @@ ${body.body || body.subject}
     const response = await client.chat.completions.create({
       model: deployment,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.3,
