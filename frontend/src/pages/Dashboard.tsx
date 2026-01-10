@@ -8,6 +8,7 @@ import { SmartViews } from '../components/dashboard/SmartViews';
 import { WeeklyBriefing } from '../components/dashboard/WeeklyBriefing';
 import { ActionBoard } from '../components/dashboard/ActionBoard';
 import { RecentActivity } from '../components/dashboard/RecentActivity';
+import { PendingClassifications } from '../components/classification/PendingClassifications';
 import { useEmails, useEmailStats } from '../hooks/useEmails';
 import { useInsights, useSmartViews } from '../hooks/useInsights';
 import type { InsightCard, SmartView } from '../types';
@@ -71,6 +72,9 @@ export const Dashboard = () => {
 
       {/* AI Insight Cards */}
       <InsightCards insights={insights} onInsightClick={handleInsightClick} />
+
+      {/* Pending Classifications */}
+      <PendingClassifications onApplied={refetch} />
 
       {/* Smart Views */}
       <SmartViews
