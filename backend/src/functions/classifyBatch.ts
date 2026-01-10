@@ -7,16 +7,26 @@ interface CategoryDefinition {
   keywords?: string[];
 }
 
+interface EmailContext {
+  isReply: boolean;
+  isForward: boolean;
+  isDirectRecipient: boolean;
+  ccCount: number;
+  senderDomain: string;
+  hasAttachments: boolean;
+}
+
 interface EmailInput {
   id: string;
   subject: string;
   body: string;
   sender: string;
+  context?: EmailContext;
 }
 
 interface BatchClassifyRequest {
   emails: EmailInput[];
-  categories?: CategoryDefinition[]; // Custom categories from frontend
+  categories?: CategoryDefinition[];
 }
 
 interface ClassificationResult {
@@ -24,6 +34,12 @@ interface ClassificationResult {
   category: string;
   confidence: number;
   reasoning: string;
+  urgency: 'low' | 'medium' | 'high' | 'critical';
+  signals: {
+    isActionRequired: boolean;
+    hasDeadline: boolean;
+    isAutomated: boolean;
+  };
 }
 
 interface BatchClassifyResponse {
@@ -43,38 +59,54 @@ const DEFAULT_CATEGORIES: CategoryDefinition[] = [
 
 function buildBatchSystemPrompt(categories: CategoryDefinition[]): string {
   const categoryList = categories.map(c => {
-    let entry = `- "${c.name}": ${c.description}`;
+    let entry = `  - "${c.name}": ${c.description}`;
     if (c.keywords && c.keywords.length > 0) {
-      entry += ` (Keywords: ${c.keywords.join(', ')})`;
+      entry += ` [${c.keywords.join(', ')}]`;
     }
     return entry;
   }).join('\n');
 
-  const categoryNames = categories.map(c => c.name);
-  const priorityOrder = categoryNames.slice(0, Math.min(6, categoryNames.length)).join(' > ');
+  return `# E-Mail-Batch-Klassifizierung
 
-  return `Du bist ein E-Mail-Klassifizierungs-Assistent für ein deutschsprachiges Unternehmen.
 Du erhältst mehrere E-Mails und klassifizierst jede einzeln.
 
-Kategorien:
+## Kategorien
 ${categoryList}
 
-Antworte NUR mit einem JSON-Objekt in diesem Format:
+## Schnell-Analyse pro E-Mail
+1. **Absender**: noreply/newsletter@ → Automatisiert | normale Adresse → Prüfen
+2. **Betreff**: RE:/AW: → Antwort | FW:/WG: → Weiterleitung | DRINGEND/ASAP → Kritisch
+3. **Kontext**: Nur CC + viele Empfänger → Info | Direkter Empfänger → Prüfen
+4. **Inhalt**: Frage/Bitte → Aktion | Nur Info → Info | Deadline → Dringend
+
+## WICHTIG: Nicht als "Dringend" klassifizieren
+- Newsletter mit Marketing-Dringlichkeit ("Letzte Chance!")
+- Automatische System-Benachrichtigungen
+- CC-Mails ohne direkte Ansprache
+
+## Ausgabe-Format
 {
   "results": [
     {
       "id": "<email-id>",
       "category": "<Kategoriename>",
       "confidence": <0.0-1.0>,
-      "reasoning": "<Kurze Begründung, max 15 Wörter>"
+      "reasoning": "<10-15 Wörter>",
+      "urgency": "<low|medium|high|critical>",
+      "signals": {
+        "isActionRequired": <bool>,
+        "hasDeadline": <bool>,
+        "isAutomated": <bool>
+      }
     }
   ]
 }
 
-Regeln:
-1. Eine Kategorie pro E-Mail, basierend auf dem Hauptzweck
-2. Bei Unsicherheit: ${priorityOrder}
-3. Newsletter und System-Mails gehören zu Info-Kategorien`;
+## Urgency
+- critical: Heute reagieren
+- high: Innerhalb 24h
+- medium: Diese Woche
+- low: Keine Eile`;
 }
 
 function getOpenAIClient(): AzureOpenAI {
@@ -90,6 +122,32 @@ function getOpenAIClient(): AzureOpenAI {
     apiKey,
     apiVersion: '2024-08-01-preview',
   });
+}
+
+function formatEmailForPrompt(email: EmailInput, index: number): string {
+  const ctx = email.context;
+
+  let text = `
+### E-Mail ${index + 1} (ID: ${email.id})
+**Betreff:** ${email.subject || '(Kein Betreff)'}
+**Von:** ${email.sender || 'Unbekannt'}`;
+
+  if (ctx) {
+    const signals = [];
+    if (!ctx.isDirectRecipient) signals.push('CC');
+    if (ctx.isReply) signals.push('RE:');
+    if (ctx.isForward) signals.push('FW:');
+    if (ctx.hasAttachments) signals.push('Anhänge');
+    if (ctx.ccCount > 3) signals.push(`${ctx.ccCount} CC`);
+
+    if (signals.length > 0) {
+      text += `\n**Signale:** ${signals.join(', ')}`;
+    }
+  }
+
+  text += `\n**Inhalt:** ${(email.body || email.subject).substring(0, 400)}`;
+
+  return text;
 }
 
 export async function classifyBatch(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -117,7 +175,6 @@ export async function classifyBatch(request: HttpRequest, context: InvocationCon
     const client = getOpenAIClient();
     const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4.1-mini';
 
-    // Use custom categories if provided, otherwise use defaults
     const categories = body.categories && body.categories.length > 0
       ? body.categories
       : DEFAULT_CATEGORIES;
@@ -126,15 +183,10 @@ export async function classifyBatch(request: HttpRequest, context: InvocationCon
 
     // Format emails for the prompt
     const emailsText = body.emails
-      .map((email, index) => `
-E-Mail ${index + 1} (ID: ${email.id}):
-Betreff: ${email.subject || '(Kein Betreff)'}
-Von: ${email.sender || 'Unbekannt'}
-Inhalt: ${(email.body || email.subject).substring(0, 500)}
----`)
-      .join('\n');
+      .map((email, index) => formatEmailForPrompt(email, index))
+      .join('\n---\n');
 
-    const userMessage = `Klassifiziere die folgenden ${body.emails.length} E-Mails:\n\n${emailsText}`;
+    const userMessage = `Klassifiziere diese ${body.emails.length} E-Mails:\n${emailsText}`;
 
     const response = await client.chat.completions.create({
       model: deployment,
@@ -142,7 +194,7 @@ Inhalt: ${(email.body || email.subject).substring(0, 500)}
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: 4000,
       response_format: { type: 'json_object' },
     });
@@ -153,7 +205,7 @@ Inhalt: ${(email.body || email.subject).substring(0, 500)}
       throw new Error('No response from OpenAI');
     }
 
-    // Parse the response - it might be wrapped in an object
+    // Parse the response
     let results: ClassificationResult[];
     const parsed = JSON.parse(content);
 

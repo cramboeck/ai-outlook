@@ -29,12 +29,21 @@ export interface Email {
   parentFolderId?: string;
 }
 
+// Klassifizierungs-Signale
+export interface ClassificationSignals {
+  isActionRequired: boolean;
+  hasDeadline: boolean;
+  isAutomated: boolean;
+}
+
 // Klassifizierungsergebnis von Azure Function
 export interface Classification {
   category: string;
   confidence: number; // 0.0 - 1.0
   reasoning: string; // Begründung auf Deutsch
+  urgency: 'low' | 'medium' | 'high' | 'critical';
   suggestedAction?: string; // Optional: Empfohlene nächste Aktion
+  signals: ClassificationSignals;
 }
 
 // Batch-Klassifizierung Response
@@ -44,9 +53,22 @@ export interface BatchClassificationResult {
     category: string;
     confidence: number;
     reasoning: string;
+    urgency: 'low' | 'medium' | 'high' | 'critical';
+    signals: ClassificationSignals;
   }>;
   totalTokens: number;
   processingTimeMs: number;
+}
+
+// E-Mail Kontext für Klassifizierung
+export interface EmailContext {
+  isReply: boolean;
+  isForward: boolean;
+  isDirectRecipient: boolean;
+  ccCount: number;
+  senderDomain: string;
+  hasAttachments: boolean;
+  attachmentTypes?: string[];
 }
 
 // Kategorie-Definition
@@ -80,6 +102,7 @@ export interface ClassifyRequest {
   sender: string;
   receivedDateTime: string;
   importance: string;
+  context?: EmailContext;
 }
 
 // Batch Classify Request
@@ -89,6 +112,7 @@ export interface BatchClassifyRequest {
     subject: string;
     body: string;
     sender: string;
+    context?: EmailContext;
   }>;
 }
 

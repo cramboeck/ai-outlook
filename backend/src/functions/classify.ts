@@ -7,20 +7,37 @@ interface CategoryDefinition {
   keywords?: string[];
 }
 
+interface EmailContext {
+  isReply: boolean;           // RE: / AW: detected
+  isForward: boolean;         // FW: / WG: detected
+  isDirectRecipient: boolean; // User is in TO, not just CC
+  ccCount: number;            // Number of CC recipients
+  senderDomain: string;       // Domain of sender
+  hasAttachments: boolean;
+  attachmentTypes?: string[]; // File extensions
+}
+
 interface ClassifyRequest {
   subject: string;
   body: string;
   sender: string;
   receivedDateTime: string;
   importance: string;
-  categories?: CategoryDefinition[]; // Custom categories from frontend
+  categories?: CategoryDefinition[];
+  context?: EmailContext;     // Enhanced context signals
 }
 
 interface ClassifyResponse {
   category: string;
   confidence: number;
   reasoning: string;
+  urgency: 'low' | 'medium' | 'high' | 'critical';
   suggestedAction?: string;
+  signals: {
+    isActionRequired: boolean;
+    hasDeadline: boolean;
+    isAutomated: boolean;
+  };
 }
 
 const DEFAULT_CATEGORIES: CategoryDefinition[] = [
@@ -32,38 +49,74 @@ const DEFAULT_CATEGORIES: CategoryDefinition[] = [
   { name: 'Intern', description: 'Interne Kommunikation, Team-Updates, HR' },
 ];
 
-function buildSystemPrompt(categories: CategoryDefinition[]): string {
+function buildEnhancedSystemPrompt(categories: CategoryDefinition[]): string {
   const categoryList = categories.map(c => {
-    let entry = `- "${c.name}": ${c.description}`;
+    let entry = `  - "${c.name}": ${c.description}`;
     if (c.keywords && c.keywords.length > 0) {
-      entry += ` (Keywords: ${c.keywords.join(', ')})`;
+      entry += ` [Keywords: ${c.keywords.join(', ')}]`;
     }
     return entry;
   }).join('\n');
 
-  const categoryNames = categories.map(c => c.name);
-  const priorityOrder = categoryNames.slice(0, Math.min(6, categoryNames.length)).join(' > ');
+  return `# E-Mail-Klassifizierungs-Experte
 
-  return `Du bist ein E-Mail-Klassifizierungs-Assistent für ein deutschsprachiges Unternehmen.
-Analysiere die E-Mail und ordne sie GENAU EINER der folgenden Kategorien zu:
+Du bist ein präziser E-Mail-Klassifizierungs-Assistent für ein deutschsprachiges Unternehmen.
 
+## Verfügbare Kategorien
 ${categoryList}
 
-Antworte NUR mit einem JSON-Objekt:
+## Analyse-Schritte (denke systematisch)
+
+### Schritt 1: Absender analysieren
+- Externe Domain → wahrscheinlich Kunde/Partner
+- Interne Domain → Kollege/Team
+- noreply@, notifications@, newsletter@ → Automatisiert
+
+### Schritt 2: Betreff-Signale erkennen
+- "DRINGEND", "URGENT", "ASAP", "!!!" → Hohe Dringlichkeit
+- "RE:", "AW:" → Antwort in laufender Konversation
+- "FW:", "WG:" → Weiterleitung (oft zur Info)
+- "Rechnung", "Invoice", "Angebot" → Finanzen
+- "Einladung", "Meeting", "Termin" → Meeting
+- "Newsletter", "Update", "Digest" → Info
+
+### Schritt 3: Inhalt bewerten
+- Direkte Frage an mich → Aktion erforderlich
+- Deadline/Frist genannt → Dringend
+- "Bitte um Rückmeldung/Freigabe" → Aktion erforderlich
+- Nur zur Kenntnisnahme → Info
+- Ich bin nur in CC → wahrscheinlich Info
+
+### Schritt 4: Kontext-Signale nutzen
+- isDirectRecipient=false + ccCount>3 → Massen-CC, meist Info
+- hasAttachments + .pdf/.xlsx → könnte Rechnung/Dokument sein
+- importance=high + isDirectRecipient → ernst nehmen
+
+## Negativ-Beispiele (NICHT als Dringend klassifizieren)
+- Newsletter mit "Letzte Chance!" → Info, nicht Dringend
+- Automatische Erinnerungen → Info
+- Marketing-Mails mit künstlicher Dringlichkeit → Info
+- CC-Mails ohne direkte Ansprache → Info
+
+## Ausgabe-Format (nur JSON, keine Erklärung davor/danach)
 {
-  "category": "<Kategoriename>",
+  "category": "<Exakter Kategoriename>",
   "confidence": <0.0-1.0>,
-  "reasoning": "<Kurze Begründung auf Deutsch, max 50 Wörter>",
-  "suggestedAction": "<Optional: Empfohlene nächste Aktion>"
+  "reasoning": "<Kurze Begründung, max 30 Wörter>",
+  "urgency": "<low|medium|high|critical>",
+  "suggestedAction": "<Konkrete nächste Aktion oder null>",
+  "signals": {
+    "isActionRequired": <true|false>,
+    "hasDeadline": <true|false>,
+    "isAutomated": <true|false>
+  }
 }
 
-Regeln:
-1. Wähle die EINE passendste Kategorie basierend auf dem Hauptzweck
-2. Bei Unsicherheit, wähle nach Priorität: ${priorityOrder}
-3. Automatische System-Mails und Newsletter gehören zu Info-Kategorien
-4. E-Mails die explizit eine Antwort fordern gehören zu Aktions-Kategorien
-5. Confidence: <0.5 = unsicher, >0.8 = sehr sicher
-6. suggestedAction nur bei dringenden oder aktionsrelevanten Kategorien angeben`;
+## Urgency-Level
+- critical: Sofortige Reaktion nötig (heute)
+- high: Innerhalb 24h bearbeiten
+- medium: Diese Woche bearbeiten
+- low: Keine zeitliche Dringlichkeit`;
 }
 
 function getOpenAIClient(): AzureOpenAI {
@@ -79,6 +132,35 @@ function getOpenAIClient(): AzureOpenAI {
     apiKey,
     apiVersion: '2024-08-01-preview',
   });
+}
+
+function buildUserMessage(body: ClassifyRequest): string {
+  const ctx = body.context;
+
+  let message = `## E-Mail zur Klassifizierung
+
+**Betreff:** ${body.subject || '(Kein Betreff)'}
+**Von:** ${body.sender || 'Unbekannt'}
+**Wichtigkeit:** ${body.importance || 'normal'}
+**Empfangen:** ${body.receivedDateTime || 'Unbekannt'}`;
+
+  // Add context signals if available
+  if (ctx) {
+    message += `\n
+**Kontext-Signale:**
+- Direkter Empfänger: ${ctx.isDirectRecipient ? 'Ja' : 'Nein (CC)'}
+- Antwort (RE:): ${ctx.isReply ? 'Ja' : 'Nein'}
+- Weiterleitung (FW:): ${ctx.isForward ? 'Ja' : 'Nein'}
+- CC-Empfänger: ${ctx.ccCount}
+- Absender-Domain: ${ctx.senderDomain || 'unbekannt'}
+- Anhänge: ${ctx.hasAttachments ? 'Ja' : 'Nein'}${ctx.attachmentTypes?.length ? ` (${ctx.attachmentTypes.join(', ')})` : ''}`;
+  }
+
+  message += `\n
+**Inhalt:**
+${body.body || body.subject}`;
+
+  return message;
 }
 
 export async function classify(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -102,17 +184,8 @@ export async function classify(request: HttpRequest, context: InvocationContext)
       ? body.categories
       : DEFAULT_CATEGORIES;
 
-    const systemPrompt = buildSystemPrompt(categories);
-
-    const userMessage = `
-Betreff: ${body.subject || '(Kein Betreff)'}
-Von: ${body.sender || 'Unbekannt'}
-Wichtigkeit: ${body.importance || 'normal'}
-Empfangen: ${body.receivedDateTime || 'Unbekannt'}
-
-Inhalt:
-${body.body || body.subject}
-`.trim();
+    const systemPrompt = buildEnhancedSystemPrompt(categories);
+    const userMessage = buildUserMessage(body);
 
     const response = await client.chat.completions.create({
       model: deployment,
@@ -120,8 +193,8 @@ ${body.body || body.subject}
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      temperature: 0.3,
-      max_tokens: 200,
+      temperature: 0.2, // Lower for more consistent results
+      max_tokens: 300,
       response_format: { type: 'json_object' },
     });
 
