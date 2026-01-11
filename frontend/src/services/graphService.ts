@@ -281,10 +281,28 @@ export const deleteEmailsBatch = async (messageIds: string[]): Promise<void> => 
 // E-Mail als gelesen/ungelesen markieren
 export const markEmailAsRead = async (
   messageId: string,
-  isRead: boolean
+  isRead: boolean = true
 ): Promise<void> => {
   const client = getGraphClient();
   await client.api(`/me/messages/${messageId}`).patch({ isRead });
+};
+
+// Mark email as unread
+export const markEmailAsUnread = async (messageId: string): Promise<void> => {
+  return markEmailAsRead(messageId, false);
+};
+
+// Flag/unflag email
+export const flagEmail = async (
+  messageId: string,
+  flagged: boolean = true
+): Promise<void> => {
+  const client = getGraphClient();
+  await client.api(`/me/messages/${messageId}`).patch({
+    flag: {
+      flagStatus: flagged ? 'flagged' : 'notFlagged',
+    },
+  });
 };
 
 // E-Mail-Entwurf erstellen

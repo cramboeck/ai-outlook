@@ -38,6 +38,7 @@ import {
   type ThemeMode,
   type FontSize,
 } from '../services/themeService';
+import { RulesManager } from '../components/settings/RulesManager';
 
 const SIGNATURE_STORAGE_KEY = 'postpilot_signature';
 
@@ -662,6 +663,9 @@ export const Settings = () => {
           )}
         </div>
       </div>
+
+      {/* Rules Section */}
+      <RulesManager />
 
       {/* Signature Section */}
       <div className="bg-white rounded-xl border border-border">
