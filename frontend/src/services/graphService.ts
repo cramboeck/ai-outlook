@@ -373,7 +373,11 @@ export const searchEmails = async (
       searchParts.push(`"${criteria.subject}"`);
     }
     if (criteria.from) {
-      searchParts.push(`"${criteria.from}"`);
+      // Remove wildcards for search, we'll filter client-side
+      const fromSearch = criteria.from.replace(/\*/g, '').replace(/@/g, ' ');
+      if (fromSearch.trim()) {
+        searchParts.push(`"${fromSearch.trim()}"`);
+      }
     }
 
     const searchQuery = searchParts.join(' ');
@@ -383,12 +387,41 @@ export const searchEmails = async (
       .header('ConsistencyLevel', 'eventual')
       .search(searchQuery)
       .select(selectFields)
-      .top(top)
+      .top(Math.min(top * 3, 500)) // Fetch more to account for client-side filtering
       .get();
 
     results = response.value || [];
 
-    // Apply additional filters client-side since $search can't combine with $filter
+    // Apply client-side filters to enforce AND logic (since $search is OR-based)
+
+    // Filter by 'from' - support wildcards like *@microsoft.com
+    if (criteria.from) {
+      const fromPattern = criteria.from.toLowerCase();
+      results = results.filter(e => {
+        const senderEmail = e.from?.emailAddress?.address?.toLowerCase() || '';
+        const senderName = e.from?.emailAddress?.name?.toLowerCase() || '';
+
+        // Handle wildcard patterns
+        if (fromPattern.includes('*')) {
+          const regex = new RegExp('^' + fromPattern.replace(/\*/g, '.*') + '$', 'i');
+          return regex.test(senderEmail) || regex.test(senderName);
+        }
+
+        // Normal substring match
+        return senderEmail.includes(fromPattern) || senderName.includes(fromPattern);
+      });
+    }
+
+    // Filter by 'subject'
+    if (criteria.subject) {
+      const subjectPattern = criteria.subject.toLowerCase();
+      results = results.filter(e => {
+        const subject = e.subject?.toLowerCase() || '';
+        return subject.includes(subjectPattern);
+      });
+    }
+
+    // Filter by date
     if (criteria.dateFrom) {
       const dateFrom = new Date(criteria.dateFrom);
       results = results.filter(e => new Date(e.receivedDateTime) >= dateFrom);
@@ -409,6 +442,9 @@ export const searchEmails = async (
     results.sort((a, b) =>
       new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime()
     );
+
+    // Limit to requested top
+    results = results.slice(0, top);
   } else {
     // No text search - use $filter and $orderby
     const filters: string[] = [];
