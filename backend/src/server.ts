@@ -11,6 +11,7 @@ import rulesRouter from './routes/rules';
 import categoriesRouter from './routes/categories';
 import macrosRouter from './routes/macros';
 import templatesRouter from './routes/templates';
+import aiRouter from './routes/ai';
 
 dotenv.config();
 
@@ -33,6 +34,9 @@ app.get('/api/health', async (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// AI Routes (no auth required - used by frontend directly)
+app.use('/api', aiRouter);
 
 // API Routes (auth required)
 app.use('/api/tenants', authMiddleware, tenantsRouter);
