@@ -5,11 +5,11 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/server.ts",
+    "dev": "npx tsx watch src/server.ts",
     "start": "node dist/server.js",
     "start:azure": "func start",
-    "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/db/seed.ts",
+    "db:migrate": "npx tsx src/db/migrate.ts",
+    "db:seed": "npx tsx src/db/seed.ts",
     "clean": "rimraf dist"
   },
   "dependencies": {
