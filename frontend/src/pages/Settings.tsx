@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { sanitizeHtml } from '../utils/sanitize';
 import {
   Check,
   Loader2,
@@ -724,7 +725,7 @@ export const Settings = () => {
               className="min-h-[150px] max-h-[250px] overflow-y-auto border border-border rounded-lg p-4 bg-white"
               contentEditable
               onInput={(e) => setSignature(e.currentTarget.innerHTML)}
-              dangerouslySetInnerHTML={{ __html: signature }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(signature) }}
               style={{ outline: 'none' }}
             />
           ) : (

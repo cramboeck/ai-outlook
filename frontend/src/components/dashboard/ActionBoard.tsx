@@ -3,6 +3,7 @@ import { Loader2, Sparkles, Calendar, Reply, Trash2, ChevronDown, ChevronUp, Rot
 import type { Email } from '../../types';
 import { extractActions, getPriorityColor, getTypeIcon, getTypeLabel } from '../../services/actionService';
 import type { ExtractedAction } from '../../services/actionService';
+import { sanitizeHtml } from '../../utils/sanitize';
 import { prepareBodyForClassification } from '../../services/classifyService';
 import { getEmailWithBody, replyToEmail, deleteEmail } from '../../services/graphService';
 import { ReplyModal } from '../email/ReplyModal';
@@ -360,7 +361,7 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
                             <div
                               className="email-content text-sm text-text"
                               dangerouslySetInnerHTML={{
-                                __html: fullEmail.body?.content || fullEmail.bodyPreview || 'Kein Inhalt verfügbar',
+                                __html: sanitizeHtml(fullEmail.body?.content || fullEmail.bodyPreview || 'Kein Inhalt verfügbar'),
                               }}
                             />
                           </div>

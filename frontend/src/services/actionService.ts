@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7071/api';
+import { api } from './apiClient';
 
 interface EmailInput {
   id: string;
@@ -23,20 +23,7 @@ interface ExtractActionsResponse {
 }
 
 export const extractActions = async (emails: EmailInput[]): Promise<ExtractActionsResponse> => {
-  const response = await fetch(`${API_URL}/extract-actions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ emails }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.details || error.error || 'Action extraction failed');
-  }
-
-  return response.json();
+  return api.post<ExtractActionsResponse>('/extract-actions', { emails });
 };
 
 // Helper: Priorität zu Farbe

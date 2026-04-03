@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7071/api';
+import { api } from './apiClient';
 
 export type ReplyTone = 'formal' | 'casual' | 'friendly' | 'assertive';
 export type ReplyIntent = 'accept' | 'decline' | 'question' | 'info' | 'custom';
@@ -23,20 +23,7 @@ export interface GenerateReplyResponse {
 }
 
 export const generateReply = async (request: GenerateReplyRequest): Promise<GenerateReplyResponse> => {
-  const response = await fetch(`${API_URL}/generate-reply`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.details || error.error || 'Reply generation failed');
-  }
-
-  return response.json();
+  return api.post<GenerateReplyResponse>('/generate-reply', request);
 };
 
 // Quick reply templates
