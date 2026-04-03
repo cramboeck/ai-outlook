@@ -1,6 +1,7 @@
 // Document Panel - Detect invoices/orders and show DMS forward buttons
 
 import { useState } from 'react';
+import { apiCall } from '../../services/officeAuth';
 
 interface EmailData {
   id: string;
@@ -23,8 +24,6 @@ interface DocumentInfo {
   };
   suggestedActions: string[];
 }
-
-const API_URL = 'http://localhost:7071/api';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   invoice: 'Rechnung',
@@ -69,8 +68,14 @@ export function DocumentPanel({ email }: { email: EmailData }) {
   const forwardTo = async (action: string) => {
     setForwarding(action);
     try {
-      // TODO: Call /api/integrations/:id/forward
-      await new Promise(r => setTimeout(r, 1000)); // Simulate
+      await apiCall('/integrations/forward', {
+        method: 'POST',
+        body: {
+          emailId: email.id,
+          action,
+          document,
+        },
+      });
     } catch {
       // Handle error
     }

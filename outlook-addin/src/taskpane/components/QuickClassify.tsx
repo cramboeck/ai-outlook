@@ -1,6 +1,7 @@
 // Quick Classify - Categorize the current email with one click
 
 import { useState } from 'react';
+import { apiCall } from '../../services/officeAuth';
 
 interface EmailData {
   id: string;
@@ -17,8 +18,6 @@ interface Classification {
   urgency?: string;
 }
 
-const API_URL = 'http://localhost:7071/api';
-
 export function QuickClassify({ email }: { email: EmailData }) {
   const [classification, setClassification] = useState<Classification | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,19 +28,14 @@ export function QuickClassify({ email }: { email: EmailData }) {
     setLoading(true);
     setError(null);
     try {
-      // TODO: Use Office SSO token exchange instead of direct call
-      const response = await fetch(`${API_URL}/classify`, {
+      const result = await apiCall<Classification>('/classify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           subject: email.subject,
           body: email.body,
           sender: email.sender,
-        }),
+        },
       });
-
-      if (!response.ok) throw new Error('Klassifizierung fehlgeschlagen');
-      const result = await response.json();
       setClassification(result);
     } catch (err) {
       setError((err as Error).message);

@@ -1,6 +1,7 @@
 // Audit Trail - Mini timeline showing processing history for the current email
 
 import { useState, useEffect } from 'react';
+import { apiCall } from '../../services/officeAuth';
 
 interface LogEntry {
   id: string;
@@ -11,8 +12,6 @@ interface LogEntry {
   rule_name?: string;
   created_at: string;
 }
-
-const API_URL = 'http://localhost:7071/api';
 
 const EVENT_ICONS: Record<string, string> = {
   classification: '\uD83C\uDFF7\uFE0F',
@@ -45,11 +44,8 @@ export function AuditTrail({ emailId }: { emailId: string }) {
   const loadAuditTrail = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/audit/email/${encodeURIComponent(emailId)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setEntries(data.timeline || []);
-      }
+      const data = await apiCall<{ timeline: LogEntry[] }>(`/audit/email/${encodeURIComponent(emailId)}`);
+      setEntries(data.timeline || []);
     } catch {
       // Silently fail - audit trail is informational
     }

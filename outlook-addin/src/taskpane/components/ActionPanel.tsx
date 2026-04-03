@@ -1,6 +1,7 @@
 // Action Panel - Shows extracted TODOs/actions from the current email
 
 import { useState } from 'react';
+import { apiCall } from '../../services/officeAuth';
 
 interface EmailData {
   id: string;
@@ -15,8 +16,6 @@ interface ExtractedAction {
   type: string;
   deadline?: string;
 }
-
-const API_URL = 'http://localhost:7071/api';
 
 const PRIORITY_COLORS: Record<string, string> = {
   high: '#dc2626',
@@ -40,18 +39,14 @@ export function ActionPanel({ email }: { email: EmailData }) {
   const extractActions = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/extract-actions`, {
+      const result = await apiCall<{ actions: ExtractedAction[] }>('/extract-actions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           subject: email.subject,
           body: email.body,
           sender: email.sender,
-        }),
+        },
       });
-
-      if (!response.ok) throw new Error('Extraktion fehlgeschlagen');
-      const result = await response.json();
       setActions(result.actions || []);
       setExtracted(true);
     } catch {
