@@ -47,8 +47,8 @@ export const authMiddleware = async (
   try {
     // Development mode - use mock data
     if (DEV_MODE) {
-      req.tenantId = req.headers['x-tenant-id'] as string || 'dev-tenant-123';
-      req.userId = req.headers['x-user-id'] as string || 'dev-user-123';
+      req.tenantId = req.headers['x-tenant-id'] as string || '00000000-0000-4000-a000-000000000001';
+      req.userId = req.headers['x-user-id'] as string || '00000000-0000-4000-a000-000000000002';
       req.userEmail = req.headers['x-user-email'] as string || 'dev@localhost';
       req.userName = req.headers['x-user-name'] as string || 'Dev User';
       return next();

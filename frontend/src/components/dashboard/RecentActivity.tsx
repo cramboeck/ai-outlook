@@ -94,7 +94,7 @@ export const RecentActivity = ({ emails, maxItems = 10, title, onRefresh }: Rece
 
   if (displayEmails.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-border p-6">
+      <div className="bg-card rounded-xl border border-border p-6">
         <h3 className="text-lg font-semibold text-text mb-4">{displayTitle}</h3>
         <p className="text-text-secondary text-sm">Keine E-Mails gefunden.</p>
       </div>
@@ -103,7 +103,7 @@ export const RecentActivity = ({ emails, maxItems = 10, title, onRefresh }: Rece
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-border">
+      <div className="bg-card rounded-xl border border-border">
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <h3 className="text-lg font-semibold text-text">{displayTitle}</h3>
           <span className="text-sm text-text-secondary">{displayEmails.length} E-Mails</span>
@@ -179,7 +179,7 @@ export const RecentActivity = ({ emails, maxItems = 10, title, onRefresh }: Rece
                       </div>
 
                       {/* Email Body Preview */}
-                      <div className="bg-white rounded-lg border border-border p-4 max-h-64 overflow-y-auto">
+                      <div className="bg-card rounded-lg border border-border p-4 max-h-64 overflow-y-auto">
                         <div
                           className="email-content text-sm text-text"
                           dangerouslySetInnerHTML={{

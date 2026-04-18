@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ClipboardList, FileText, PlugZap, ScrollText } from 'lucide-react';
 import { StatsCards } from '../components/dashboard/StatsCards';
 import { InsightCards } from '../components/dashboard/InsightCards';
 import { SmartViews } from '../components/dashboard/SmartViews';
@@ -99,6 +99,29 @@ export const Dashboard = () => {
         byCategory={stats.byCategory}
         isLoading={isLoading}
       />
+
+      {/* Quick Actions */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-text">Schnellzugriff</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { icon: ClipboardList, title: 'Offene Aufgaben', subtitle: 'Aufgaben verwalten', path: '/actions' },
+            { icon: FileText, title: 'Dokumente', subtitle: 'Rechnungen & Belege', path: '/documents' },
+            { icon: PlugZap, title: 'Integrationen', subtitle: 'DMS-Verbindungen', path: '/integrations' },
+            { icon: ScrollText, title: 'Audit Log', subtitle: 'Verarbeitungsprotokoll', path: '/audit' },
+          ].map((item) => (
+            <div
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              className="bg-card rounded-xl border border-border p-4 hover:border-primary hover:shadow-md transition-all cursor-pointer"
+            >
+              <item.icon className="w-6 h-6 text-primary mb-2" />
+              <p className="font-medium text-text">{item.title}</p>
+              <p className="text-sm text-text-secondary">{item.subtitle}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Recent Activity - gefiltert wenn SmartView aktiv */}
       <RecentActivity

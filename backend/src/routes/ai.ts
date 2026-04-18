@@ -2,9 +2,9 @@
 // Wraps Azure OpenAI calls for the Express server
 
 import { Router } from 'express';
-import OpenAI from 'openai';
 import { validate } from '../middleware/validate';
 import { classifySchema, classifyBatchSchema, extractActionsSchema, generateReplySchema, suggestFolderSchema } from '../schemas/ai.schema';
+import { getOpenAIClient, getModel, wrapSystemPrompt } from '../services/openaiClient';
 import { logger } from '../services/logger';
 
 const router = Router();
@@ -43,27 +43,6 @@ const DEFAULT_CATEGORIES: CategoryDefinition[] = [
   { name: 'Intern', description: 'Interne Kommunikation, Team-Updates' },
 ];
 
-// Get OpenAI client (supports both Azure OpenAI and OpenAI)
-function getOpenAIClient(): OpenAI {
-  // Check for Azure OpenAI first
-  if (process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_API_KEY) {
-    return new OpenAI({
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini'}`,
-      defaultQuery: { 'api-version': '2024-08-01-preview' },
-      defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_API_KEY },
-    });
-  }
-
-  // Fall back to regular OpenAI
-  if (process.env.OPENAI_API_KEY) {
-    return new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-
-  throw new Error('No OpenAI configuration found. Set OPENAI_API_KEY or AZURE_OPENAI_* variables.');
-}
 
 // Build system prompt for batch classification
 function buildBatchSystemPrompt(categories: CategoryDefinition[]): string {
@@ -183,7 +162,7 @@ router.post('/classify', validate(classifySchema), async (req, res, next) => {
     const { subject, body, sender, context, categories } = req.body;
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const cats = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES;
     const systemPrompt = buildClassifySystemPrompt(cats);
@@ -206,11 +185,11 @@ router.post('/classify', validate(classifySchema), async (req, res, next) => {
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.2,
-      max_tokens: 500,
+      max_tokens: 150,
       response_format: { type: 'json_object' },
     });
 
@@ -234,7 +213,7 @@ router.post('/classify-batch', validate(classifyBatchSchema), async (req, res, n
     const startTime = Date.now();
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const cats = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES;
     const systemPrompt = buildBatchSystemPrompt(cats);
@@ -249,11 +228,11 @@ router.post('/classify-batch', validate(classifyBatchSchema), async (req, res, n
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.2,
-      max_tokens: 4000,
+      max_tokens: 2000,
       response_format: { type: 'json_object' },
     });
 
@@ -296,7 +275,7 @@ router.post('/extract-actions', validate(extractActionsSchema), async (req, res,
     const { subject, body, sender } = req.body;
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const systemPrompt = `# Aufgaben-Extraktion aus E-Mail
 
@@ -322,11 +301,11 @@ Wenn keine Aktionen erkennbar sind, gib ein leeres Array zurück.`;
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.3,
-      max_tokens: 1000,
+      max_tokens: 400,
       response_format: { type: 'json_object' },
     });
 
@@ -349,7 +328,7 @@ router.post('/generate-reply', validate(generateReplySchema), async (req, res, n
     const { subject, body, sender, replyType, userName, additionalContext } = req.body;
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const replyStyles: Record<string, string> = {
       accept: 'Zustimmend, positiv',
@@ -390,11 +369,11 @@ Schreibe eine professionelle Antwort auf die E-Mail.
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.7,
-      max_tokens: 1500,
+      max_tokens: 800,
       response_format: { type: 'json_object' },
     });
 
@@ -417,7 +396,7 @@ router.post('/suggest-folder', validate(suggestFolderSchema), async (req, res, n
     const { subject, body, sender, folders } = req.body;
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const folderList = folders.map((f: any) => `- ${f.displayName || f.name}`).join('\n');
 
@@ -440,11 +419,11 @@ ${folderList}
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.2,
-      max_tokens: 200,
+      max_tokens: 100,
       response_format: { type: 'json_object' },
     });
 

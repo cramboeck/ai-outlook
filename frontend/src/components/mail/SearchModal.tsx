@@ -464,7 +464,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+      <div className="bg-card rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
@@ -504,7 +504,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                 {macros.map((macro) => (
                   <div
                     key={macro.id}
-                    className="group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white cursor-pointer transition-colors"
+                    className="group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-card cursor-pointer transition-colors"
                     onClick={() => handleLoadMacro(macro)}
                   >
                     <span className="text-lg">{macro.icon}</span>
@@ -874,7 +874,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
             <div className="flex-1 overflow-hidden flex flex-col">
               {/* Results Header */}
               {hasSearched && (
-                <div className="px-6 py-3 border-b border-border bg-white">
+                <div className="px-6 py-3 border-b border-border bg-card">
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-4">
                       <button
@@ -912,7 +912,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                             Kategorisieren
                           </button>
                           {showCategoryPicker && (
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-border rounded-lg shadow-lg z-50 py-1">
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1">
                               {categories.map((cat) => (
                                 <button
                                   key={cat}
@@ -938,8 +938,8 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                           </button>
 
                           {showFolderPicker && (
-                            <div className="absolute right-0 top-full mt-1 w-72 max-h-64 overflow-y-auto bg-white border border-border rounded-lg shadow-lg z-50">
-                              <div className="p-2 border-b border-border sticky top-0 bg-white">
+                            <div className="absolute right-0 top-full mt-1 w-72 max-h-64 overflow-y-auto bg-card border border-border rounded-lg shadow-lg z-50">
+                              <div className="p-2 border-b border-border sticky top-0 bg-card">
                                 <p className="text-xs font-medium text-text-secondary">Zielordner wählen</p>
                               </div>
                               <div className="py-1">
@@ -999,7 +999,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                           </button>
 
                           {showDeleteConfirm && (
-                            <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-border rounded-lg shadow-lg z-50 p-4">
+                            <div className="absolute right-0 top-full mt-1 w-64 bg-card border border-border rounded-lg shadow-lg z-50 p-4">
                               <p className="text-sm text-text mb-3">
                                 <strong>{selectedIds.size} E-Mail(s)</strong> wirklich löschen?
                               </p>
@@ -1113,7 +1113,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
         <div className="px-6 py-4 border-t border-border bg-gray-50 flex items-center justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-text-secondary hover:text-text border border-border rounded-lg hover:bg-white transition-colors"
+            className="px-4 py-2 text-sm text-text-secondary hover:text-text border border-border rounded-lg hover:bg-card transition-colors"
           >
             Schließen
           </button>
@@ -1122,7 +1122,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
         {/* Save Macro Modal */}
         {showSaveMacro && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-md p-6">
               <h3 className="text-lg font-semibold text-text mb-4">Suche als Makro speichern</h3>
 
               <div className="space-y-4">
@@ -1135,7 +1135,7 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                       {macroIcon}
                     </button>
                     {showIconPicker && (
-                      <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-border rounded-lg shadow-lg z-50 p-2 grid grid-cols-8 gap-1">
+                      <div className="absolute top-full left-0 mt-1 w-64 bg-card border border-border rounded-lg shadow-lg z-50 p-2 grid grid-cols-8 gap-1">
                         {MACRO_ICONS.map((icon) => (
                           <button
                             key={icon}
@@ -1176,15 +1176,15 @@ export const SearchModal = ({ isOpen, onClose, onMoved }: SearchModalProps) => {
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-text-secondary mb-2">Gespeicherte Kriterien:</p>
                   <div className="flex flex-wrap gap-1">
-                    {query && <span className="px-2 py-0.5 bg-white rounded text-xs">Text: {query}</span>}
-                    {from && <span className="px-2 py-0.5 bg-white rounded text-xs">Von: {from}</span>}
-                    {subject && <span className="px-2 py-0.5 bg-white rounded text-xs">Betreff: {subject}</span>}
-                    {datePreset !== 'custom' && <span className="px-2 py-0.5 bg-white rounded text-xs">Zeitraum: {datePreset}</span>}
-                    {hasAttachments !== undefined && <span className="px-2 py-0.5 bg-white rounded text-xs">Anhänge: {hasAttachments ? 'Ja' : 'Nein'}</span>}
-                    {isRead !== undefined && <span className="px-2 py-0.5 bg-white rounded text-xs">{isRead ? 'Gelesen' : 'Ungelesen'}</span>}
-                    {importance && <span className="px-2 py-0.5 bg-white rounded text-xs">Priorität: {importance}</span>}
-                    {selectedCategories.length > 0 && <span className="px-2 py-0.5 bg-white rounded text-xs">Kategorien: {selectedCategories.join(', ')}</span>}
-                    {filterUncategorized && <span className="px-2 py-0.5 bg-white rounded text-xs">Unkategorisiert</span>}
+                    {query && <span className="px-2 py-0.5 bg-card rounded text-xs">Text: {query}</span>}
+                    {from && <span className="px-2 py-0.5 bg-card rounded text-xs">Von: {from}</span>}
+                    {subject && <span className="px-2 py-0.5 bg-card rounded text-xs">Betreff: {subject}</span>}
+                    {datePreset !== 'custom' && <span className="px-2 py-0.5 bg-card rounded text-xs">Zeitraum: {datePreset}</span>}
+                    {hasAttachments !== undefined && <span className="px-2 py-0.5 bg-card rounded text-xs">Anhänge: {hasAttachments ? 'Ja' : 'Nein'}</span>}
+                    {isRead !== undefined && <span className="px-2 py-0.5 bg-card rounded text-xs">{isRead ? 'Gelesen' : 'Ungelesen'}</span>}
+                    {importance && <span className="px-2 py-0.5 bg-card rounded text-xs">Priorität: {importance}</span>}
+                    {selectedCategories.length > 0 && <span className="px-2 py-0.5 bg-card rounded text-xs">Kategorien: {selectedCategories.join(', ')}</span>}
+                    {filterUncategorized && <span className="px-2 py-0.5 bg-card rounded text-xs">Unkategorisiert</span>}
                   </div>
                 </div>
               </div>

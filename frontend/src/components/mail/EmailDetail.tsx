@@ -8,6 +8,7 @@ import {
   Trash2,
   Paperclip,
   Sparkles,
+  ScanSearch,
   Loader2,
   User,
   Calendar,
@@ -24,6 +25,8 @@ interface EmailDetailProps {
   onReplyAll?: (email: Email) => void;
   onForward?: (email: Email) => void;
   onClassify?: (email: Email) => void;
+  onAnalyze?: (email: Email) => void;
+  isAnalyzing?: boolean;
   onDelete?: () => void;
   onMoved?: () => void;
   showFolderSuggestion?: boolean;
@@ -36,6 +39,8 @@ export const EmailDetail = ({
   onReplyAll,
   onForward,
   onClassify,
+  onAnalyze,
+  isAnalyzing = false,
   onDelete,
   onMoved,
   showFolderSuggestion = true,
@@ -138,6 +143,17 @@ export const EmailDetail = ({
             >
               <Sparkles className="w-4 h-4" />
               KI
+            </button>
+          )}
+          {onAnalyze && (
+            <button
+              onClick={() => onAnalyze(fullEmail || email)}
+              disabled={isAnalyzing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-emerald-500 text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
+              title="Vollständige Analyse: Kategorie, Aufgaben & Dokumente erkennen"
+            >
+              {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanSearch className="w-4 h-4" />}
+              Analysieren
             </button>
           )}
         </div>

@@ -18,7 +18,7 @@ export const Privacy = () => {
             <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary-dark rounded-lg flex items-center justify-center">
               <Mail className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-text">PostPilot</span>
+            <span className="font-bold text-text">MailSort</span>
           </div>
         </div>
       </header>
@@ -55,7 +55,7 @@ export const Privacy = () => {
                 2. Welche Daten wir verarbeiten
               </h2>
               <p className="text-text-secondary mb-4">
-                Bei der Nutzung von PostPilot verarbeiten wir folgende Daten:
+                Bei der Nutzung von MailSort verarbeiten wir folgende Daten:
               </p>
               <ul className="list-disc list-inside text-text-secondary space-y-2 ml-4">
                 <li><strong>Microsoft-Kontodaten:</strong> Name, E-Mail-Adresse (über Microsoft OAuth 2.0)</li>
@@ -72,7 +72,7 @@ export const Privacy = () => {
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
                 <h3 className="font-semibold text-green-800 mb-2">Wichtig: Keine E-Mail-Speicherung</h3>
                 <p className="text-green-700 text-sm">
-                  PostPilot speichert keine E-Mail-Inhalte auf eigenen Servern. E-Mails werden nur
+                  MailSort speichert keine E-Mail-Inhalte auf eigenen Servern. E-Mails werden nur
                   temporär zur Verarbeitung durch die KI gelesen und sofort wieder verworfen.
                 </p>
               </div>
@@ -90,7 +90,7 @@ export const Privacy = () => {
                 4. Drittanbieter und Unterauftragnehmer
               </h2>
               <p className="text-text-secondary mb-4">
-                Wir nutzen folgende Dienste zur Bereitstellung von PostPilot:
+                Wir nutzen folgende Dienste zur Bereitstellung von MailSort:
               </p>
               <div className="space-y-4">
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -141,11 +141,11 @@ export const Privacy = () => {
                 6. Zugriff widerrufen
               </h2>
               <p className="text-text-secondary mb-4">
-                Sie können den Zugriff von PostPilot auf Ihr Microsoft-Konto jederzeit widerrufen:
+                Sie können den Zugriff von MailSort auf Ihr Microsoft-Konto jederzeit widerrufen:
               </p>
               <ol className="list-decimal list-inside text-text-secondary space-y-2 ml-4">
                 <li>Gehen Sie zu <a href="https://account.live.com/consent/Manage" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Microsoft Konto-Einstellungen</a></li>
-                <li>Suchen Sie "PostPilot" in der Liste der Apps</li>
+                <li>Suchen Sie "MailSort" in der Liste der Apps</li>
                 <li>Klicken Sie auf "Entfernen" um alle Berechtigungen zu widerrufen</li>
               </ol>
             </section>

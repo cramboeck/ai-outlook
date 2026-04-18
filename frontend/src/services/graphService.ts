@@ -562,3 +562,211 @@ export const getSentEmailsWithoutReply = async (
     (email: Email) => !inboxConversationIds.has(email.conversationId)
   );
 };
+
+// ---------------------------------------------------------------------------
+// Email Attachments
+// ---------------------------------------------------------------------------
+
+export interface EmailAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  isInline: boolean;
+  contentBytes?: string; // base64 encoded
+}
+
+// Get attachments for an email
+export const getEmailAttachments = async (messageId: string): Promise<EmailAttachment[]> => {
+  const client = getGraphClient();
+  const response = await client
+    .api(`/me/messages/${messageId}/attachments`)
+    .select('id,name,contentType,size,isInline')
+    .get();
+  return response.value || [];
+};
+
+// Get a single attachment with content (base64)
+export const getEmailAttachmentContent = async (messageId: string, attachmentId: string): Promise<EmailAttachment> => {
+  const client = getGraphClient();
+  return await client
+    .api(`/me/messages/${messageId}/attachments/${attachmentId}`)
+    .get();
+};
+
+// Get all PDF/document attachments for an email (with content)
+export const getDocumentAttachments = async (messageId: string): Promise<EmailAttachment[]> => {
+  const attachments = await getEmailAttachments(messageId);
+  const docTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/tiff', 'application/vnd.openxmlformats-officedocument'];
+
+  const docAttachments = attachments.filter(a =>
+    !a.isInline && docTypes.some(t => a.contentType.startsWith(t))
+  );
+
+  // Fetch content for each document attachment
+  const withContent: EmailAttachment[] = [];
+  for (const att of docAttachments) {
+    const full = await getEmailAttachmentContent(messageId, att.id);
+    withContent.push(full);
+  }
+
+  return withContent;
+};
+
+// ---------------------------------------------------------------------------
+// Microsoft To-Do
+// ---------------------------------------------------------------------------
+
+export interface TodoTaskList {
+  id: string;
+  displayName: string;
+  isOwner: boolean;
+  isShared: boolean;
+  wellknownListName?: string; // 'defaultList', 'flaggedEmails', etc.
+}
+
+export interface TodoTask {
+  id: string;
+  title: string;
+  body?: { content: string; contentType: string };
+  status: 'notStarted' | 'inProgress' | 'completed' | 'waitingOnOthers' | 'deferred';
+  importance: 'low' | 'normal' | 'high';
+  isReminderOn?: boolean;
+  createdDateTime: string;
+  lastModifiedDateTime: string;
+  completedDateTime?: { dateTime: string; timeZone: string };
+  dueDateTime?: { dateTime: string; timeZone: string };
+  categories?: string[];
+  linkedResources?: Array<{
+    id: string;
+    webUrl: string;
+    applicationName: string;
+    displayName: string;
+  }>;
+}
+
+// Get all To-Do lists
+export const getTodoLists = async (): Promise<TodoTaskList[]> => {
+  const client = getGraphClient();
+  const response = await client
+    .api('/me/todo/lists')
+    .select('id,displayName,isOwner,isShared,wellknownListName')
+    .get();
+  return response.value || [];
+};
+
+// Get tasks from a specific list
+export const getTodoTasks = async (
+  listId: string,
+  top: number = 100,
+  includeCompleted: boolean = false
+): Promise<TodoTask[]> => {
+  const client = getGraphClient();
+  let request = client
+    .api(`/me/todo/lists/${listId}/tasks`)
+    .select('id,title,body,status,importance,isReminderOn,createdDateTime,lastModifiedDateTime,completedDateTime,dueDateTime,categories,linkedResources')
+    .top(top)
+    .orderby('createdDateTime desc');
+
+  if (!includeCompleted) {
+    request = request.filter("status ne 'completed'");
+  }
+
+  const response = await request.get();
+  return response.value || [];
+};
+
+// Get all tasks from all lists (convenience function)
+export const getAllTodoTasks = async (includeCompleted: boolean = false): Promise<{
+  lists: TodoTaskList[];
+  tasks: Array<TodoTask & { listId: string; listName: string }>;
+}> => {
+  const lists = await getTodoLists();
+  const allTasks: Array<TodoTask & { listId: string; listName: string }> = [];
+
+  for (const list of lists) {
+    const tasks = await getTodoTasks(list.id, 200, includeCompleted);
+    for (const task of tasks) {
+      allTasks.push({ ...task, listId: list.id, listName: list.displayName });
+    }
+  }
+
+  return { lists, tasks: allTasks };
+};
+
+// Create a task in a To-Do list
+export const createTodoTask = async (
+  listId: string,
+  task: {
+    title: string;
+    body?: string;
+    importance?: 'low' | 'normal' | 'high';
+    dueDateTime?: string; // ISO date
+    linkedResourceUrl?: string;
+    linkedResourceName?: string;
+  }
+): Promise<TodoTask> => {
+  const client = getGraphClient();
+
+  const taskBody: any = {
+    title: task.title,
+    importance: task.importance || 'normal',
+  };
+
+  if (task.body) {
+    taskBody.body = { content: task.body, contentType: 'text' };
+  }
+  if (task.dueDateTime) {
+    taskBody.dueDateTime = {
+      dateTime: task.dueDateTime,
+      timeZone: 'Europe/Berlin',
+    };
+  }
+
+  const created = await client
+    .api(`/me/todo/lists/${listId}/tasks`)
+    .post(taskBody);
+
+  // Add linked resource if provided
+  if (task.linkedResourceUrl && created.id) {
+    try {
+      await client
+        .api(`/me/todo/lists/${listId}/tasks/${created.id}/linkedResources`)
+        .post({
+          webUrl: task.linkedResourceUrl,
+          applicationName: 'MailSort',
+          displayName: task.linkedResourceName || 'MailSort Aufgabe',
+        });
+    } catch { /* linked resources are optional */ }
+  }
+
+  return created;
+};
+
+// Update a To-Do task
+export const updateTodoTask = async (
+  listId: string,
+  taskId: string,
+  updates: {
+    title?: string;
+    status?: TodoTask['status'];
+    importance?: TodoTask['importance'];
+    dueDateTime?: string | null;
+  }
+): Promise<TodoTask> => {
+  const client = getGraphClient();
+  const body: any = {};
+
+  if (updates.title !== undefined) body.title = updates.title;
+  if (updates.status !== undefined) body.status = updates.status;
+  if (updates.importance !== undefined) body.importance = updates.importance;
+  if (updates.dueDateTime !== undefined) {
+    body.dueDateTime = updates.dueDateTime
+      ? { dateTime: updates.dueDateTime, timeZone: 'Europe/Berlin' }
+      : null;
+  }
+
+  return await client
+    .api(`/me/todo/lists/${listId}/tasks/${taskId}`)
+    .patch(body);
+};

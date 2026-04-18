@@ -166,7 +166,7 @@ const RuleEditModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-card rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h3 className="text-lg font-semibold text-text">
@@ -193,7 +193,7 @@ const RuleEditModal = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="z.B. Newsletter kategorisieren"
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-gray-700 text-text"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-bg text-text"
               />
             </div>
             <div>
@@ -205,7 +205,7 @@ const RuleEditModal = ({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optionale Beschreibung"
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-gray-700 text-text"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-bg text-text"
               />
             </div>
           </div>
@@ -217,7 +217,7 @@ const RuleEditModal = ({
               <select
                 value={matchMode}
                 onChange={(e) => setMatchMode(e.target.value as 'all' | 'any')}
-                className="text-sm px-2 py-1 border border-border rounded bg-white dark:bg-gray-700 text-text"
+                className="text-sm px-2 py-1 border border-border rounded bg-bg text-text"
               >
                 <option value="all">Alle Bedingungen (UND)</option>
                 <option value="any">Eine Bedingung (ODER)</option>
@@ -234,7 +234,7 @@ const RuleEditModal = ({
                   value={fromContains}
                   onChange={(e) => setFromContains(e.target.value)}
                   placeholder="z.B. newsletter"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 />
               </div>
               <div>
@@ -246,7 +246,7 @@ const RuleEditModal = ({
                   value={fromDomain}
                   onChange={(e) => setFromDomain(e.target.value)}
                   placeholder="z.B. microsoft.com"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 />
               </div>
               <div>
@@ -258,7 +258,7 @@ const RuleEditModal = ({
                   value={subjectContains}
                   onChange={(e) => setSubjectContains(e.target.value)}
                   placeholder="z.B. Rechnung"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 />
               </div>
               <div>
@@ -270,7 +270,7 @@ const RuleEditModal = ({
                   value={bodyContains}
                   onChange={(e) => setBodyContains(e.target.value)}
                   placeholder="z.B. unsubscribe"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 />
               </div>
             </div>
@@ -287,7 +287,7 @@ const RuleEditModal = ({
                       e.target.value === '' ? undefined : e.target.value === 'true'
                     )
                   }
-                  className="px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 >
                   <option value="">Egal</option>
                   <option value="true">Mit Anhängen</option>
@@ -305,7 +305,7 @@ const RuleEditModal = ({
                       (e.target.value as 'high' | 'normal' | 'low') || undefined
                     )
                   }
-                  className="px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 >
                   <option value="">Egal</option>
                   <option value="high">Hoch</option>
@@ -331,7 +331,7 @@ const RuleEditModal = ({
                   return (
                     <div
                       key={index}
-                      className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                      className="flex items-center gap-3 p-3 bg-bg rounded-lg"
                     >
                       <Icon className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium text-text">
@@ -348,7 +348,7 @@ const RuleEditModal = ({
                               targetFolderName: folder?.displayName,
                             });
                           }}
-                          className="flex-1 px-2 py-1 border border-border rounded text-sm bg-white dark:bg-gray-600 text-text"
+                          className="flex-1 px-2 py-1 border border-border rounded text-sm bg-bg text-text"
                         >
                           <option value="">Ordner wählen...</option>
                           {folders.map((folder) => (
@@ -365,7 +365,7 @@ const RuleEditModal = ({
                           onChange={(e) =>
                             handleUpdateAction(index, { targetCategory: e.target.value })
                           }
-                          className="flex-1 px-2 py-1 border border-border rounded text-sm bg-white dark:bg-gray-600 text-text"
+                          className="flex-1 px-2 py-1 border border-border rounded text-sm bg-bg text-text"
                         >
                           <option value="">Kategorie wählen...</option>
                           {categories.map((cat) => (
@@ -399,7 +399,7 @@ const RuleEditModal = ({
               </button>
 
               {showAddAction && (
-                <div className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 border border-border rounded-lg shadow-lg z-10 py-1 min-w-[200px]">
+                <div className="absolute top-full mt-1 left-0 bg-card border border-border rounded-lg shadow-lg z-10 py-1 min-w-[200px]">
                   {[
                     { type: 'move' as const, label: 'Verschieben' },
                     { type: 'categorize' as const, label: 'Kategorisieren' },
@@ -452,7 +452,7 @@ const RuleEditModal = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border bg-gray-50 dark:bg-gray-700">
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border bg-bg">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
@@ -581,7 +581,7 @@ export const RulesManager = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'postpilot-rules.json';
+    a.download = 'mailsort-rules.json';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -632,7 +632,7 @@ export const RulesManager = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-border">
+    <div className="bg-card rounded-xl border border-border">
       <div className="px-6 py-4 border-b border-border">
         <div className="flex items-center justify-between">
           <div>
@@ -697,8 +697,8 @@ export const RulesManager = () => {
                 key={rule.id}
                 className={`border rounded-lg transition-colors ${
                   rule.enabled
-                    ? 'border-border bg-white dark:bg-gray-700'
-                    : 'border-border/50 bg-gray-50 dark:bg-gray-800 opacity-60'
+                    ? 'border-border bg-bg'
+                    : 'border-border/50 bg-bg opacity-60'
                 }`}
               >
                 {/* Rule Header */}

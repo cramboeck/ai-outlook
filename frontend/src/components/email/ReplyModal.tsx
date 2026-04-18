@@ -91,7 +91,7 @@ export const ReplyModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-card rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-gradient-to-r from-primary/5 to-primary/10">
           <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export const ReplyModal = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white rounded-lg transition-colors"
+            className="p-2 hover:bg-card rounded-lg transition-colors"
           >
             <X className="w-5 h-5 text-text-secondary" />
           </button>
@@ -280,7 +280,7 @@ export const ReplyModal = ({
             <div className="flex items-center gap-3">
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-white transition-colors"
+                className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-card transition-colors"
               >
                 {copied ? (
                   <>

@@ -98,7 +98,7 @@ export const PendingClassifications = ({ onApplied, compact = false }: PendingCl
   };
 
   return (
-    <div className="bg-white rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-xl border border-border overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}

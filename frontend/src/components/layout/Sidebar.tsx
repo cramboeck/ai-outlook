@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Mail, Settings, X, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Mail, Settings, X, ScrollText, PlugZap, ClipboardList, FileText } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -9,7 +9,10 @@ interface SidebarProps {
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/mail', icon: Mail, label: 'E-Mail' },
+  { to: '/actions', icon: ClipboardList, label: 'Aufgaben' },
+  { to: '/documents', icon: FileText, label: 'Dokumente' },
   { to: '/audit', icon: ScrollText, label: 'Audit Log' },
+  { to: '/integrations', icon: PlugZap, label: 'Integrationen' },
   { to: '/settings', icon: Settings, label: 'Einstellungen' },
 ];
 

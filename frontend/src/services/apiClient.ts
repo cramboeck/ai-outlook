@@ -61,14 +61,25 @@ export const apiClient = async <T = unknown>(
   };
 
   if (!skipAuth) {
-    try {
-      const token = await getAccessToken();
-      requestHeaders['Authorization'] = `Bearer ${token}`;
-    } catch {
-      // In development, allow requests without token
+    let gotToken = false;
+    if (msalInstance) {
+      const accounts = msalInstance.getAllAccounts();
+      if (accounts.length > 0) {
+        try {
+          const token = await getAccessToken();
+          requestHeaders['Authorization'] = `Bearer ${token}`;
+          gotToken = true;
+        } catch {
+          // Token acquisition failed - fall through to dev mode
+        }
+      }
+    }
+
+    if (!gotToken) {
       if (import.meta.env.DEV) {
-        requestHeaders['X-Tenant-Id'] = 'dev-tenant-123';
-        requestHeaders['X-User-Id'] = 'dev-user-123';
+        // Dev mode: send mock auth headers (backend SKIP_AUTH=true accepts these)
+        requestHeaders['X-Tenant-Id'] = '00000000-0000-4000-a000-000000000001';
+        requestHeaders['X-User-Id'] = '00000000-0000-4000-a000-000000000002';
         requestHeaders['X-User-Email'] = 'dev@localhost';
         requestHeaders['X-User-Name'] = 'Dev User';
       } else {
