@@ -271,7 +271,7 @@ export async function forwardToIntegration(
             creditDebit: 'D',
             supplierName: docData.vendor || 'Unbekannter Lieferant',
             voucherDate: new Date().toISOString().split('T')[0],
-            taxType: 'default',
+            taxType: docData.taxType || 'default',
             ...(config.contact_id ? { supplier: { id: parseInt(config.contact_id, 10), objectName: 'Contact' } } : {}),
           },
           voucherPosSave: sumGross > 0 ? [{
