@@ -9,9 +9,11 @@ import type { ProcessingResult } from '../engine/processingPipeline';
 import { createClassifier } from '../services/classificationService';
 import { createActionExtractor } from '../services/actionExtractionService';
 import { createDocumentDetector } from '../services/documentDetectorAdapter';
+import { createCopilotDraftGenerator } from '../services/copilotDraftAdapter';
 import { forwardToIntegration, evaluateForwardRules } from '../services/forwardService';
 import { isAIConfigured, getOpenAIClient, getModel } from '../services/openaiClient';
-import { query } from '../db';
+import { isOboConfigured, extractBearerToken } from '../services/authService';
+import { query, queryOne } from '../db';
 import { logEvent } from '../services/auditService';
 import { logger } from '../services/logger';
 
@@ -28,7 +30,30 @@ function getAIServices() {
     classifier: createClassifier(),
     actionExtractor: createActionExtractor(),
     documentDetector: createDocumentDetector(),
+    // Only expose the Copilot generator when OBO is configured. Without
+    // AZURE_CLIENT_SECRET the pipeline's eligibility check would fail anyway.
+    copilotDraftGenerator: isOboConfigured() ? createCopilotDraftGenerator() : undefined,
   };
+}
+
+/**
+ * Load the tenant's has_copilot_license flag. Returns false when the tenant
+ * is missing (dev / first-request edge case).
+ */
+async function loadCopilotLicense(tenantId: string): Promise<boolean> {
+  try {
+    const row = await queryOne<{ has_copilot_license: boolean }>(
+      'SELECT has_copilot_license FROM tenants WHERE id = $1',
+      [tenantId]
+    );
+    return row?.has_copilot_license === true;
+  } catch (err) {
+    logger.warn('Failed to load copilot license flag', {
+      tenantId,
+      error: (err as Error).message,
+    });
+    return false;
+  }
 }
 
 /**
@@ -84,6 +109,34 @@ async function persistResults(
       if (actionId) {
         await checkAutoForward(tenantId, actionId, result.document.type, email, result.document.extractedData);
       }
+    }
+
+    // 4. Persist Copilot draft (premium). Skip entries represent "we tried but
+    //    couldn't produce one" and are not written — the UI falls back to the
+    //    standard reply generator in that case.
+    if (result.copilotDraft && !result.copilotDraft.skipped && result.copilotDraft.draftText) {
+      const d = result.copilotDraft;
+      await query(
+        `INSERT INTO email_drafts (
+           tenant_id, user_id, email_id, email_subject, source, draft_text,
+           citations, tokens_prompt, tokens_completion, estimated_cost_usd,
+           processing_time_ms, metadata
+         ) VALUES (
+           $1, $2, $3, $4, 'copilot_rag', $5,
+           $6::jsonb, $7, $8, $9, $10, $11::jsonb
+         )`,
+        [
+          tenantId,
+          userId,
+          email.id,
+          email.subject,
+          d.draftText,
+          JSON.stringify(d.citations),
+          0, 0, 0, // token/cost already aggregated on result.tokenUsage; keep row-level defaults
+          d.processingTimeMs,
+          JSON.stringify({ model: d.model, retrievalHitCount: d.retrievalHitCount }),
+        ]
+      );
     }
   } catch (error) {
     logger.error('Failed to persist processing results', {
@@ -236,12 +289,18 @@ router.post('/process-email', async (req, res, next) => {
     };
 
     const services = getAIServices();
+    const userAccessToken = extractBearerToken(req.headers.authorization);
+    const hasCopilotLicense = await loadCopilotLicense(req.tenantId!);
 
     const result = await processEmail(
       req.tenantId!,
       req.userId!,
       emailForProcessing,
-      options || {},
+      {
+        ...(options || {}),
+        userAccessToken: userAccessToken ?? undefined,
+        hasCopilotLicense,
+      },
       services
     );
 
@@ -288,12 +347,18 @@ router.post('/process-batch', async (req, res, next) => {
     }));
 
     const services = getAIServices();
+    const userAccessToken = extractBearerToken(req.headers.authorization);
+    const hasCopilotLicense = await loadCopilotLicense(req.tenantId!);
 
     const results = await processEmailBatch(
       req.tenantId!,
       req.userId!,
       emailsForProcessing,
-      options || {},
+      {
+        ...(options || {}),
+        userAccessToken: userAccessToken ?? undefined,
+        hasCopilotLicense,
+      },
       services
     );
 

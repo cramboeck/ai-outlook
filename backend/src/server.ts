@@ -21,6 +21,7 @@ import actionsRouter from './routes/actions';
 import integrationsRouter from './routes/integrations';
 import todoSyncRouter from './routes/todoSync';
 import betaSignupRouter from './routes/betaSignup';
+import copilotRouter from './routes/copilot';
 
 dotenv.config();
 
@@ -80,6 +81,10 @@ app.use('/api/audit', authMiddleware, crudRateLimiter, auditRouter);
 app.use('/api/actions', authMiddleware, crudRateLimiter, actionsRouter);
 app.use('/api/integrations', authMiddleware, crudRateLimiter, integrationsRouter);
 app.use('/api/todo', authMiddleware, crudRateLimiter, todoSyncRouter);
+
+// Copilot premium feature: generate/fetch Context-Aware Drafts. Uses the AI
+// rate limiter because the endpoint calls Azure OpenAI + Graph retrieval.
+app.use('/api/copilot', authMiddleware, aiRateLimiter, copilotRouter);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
