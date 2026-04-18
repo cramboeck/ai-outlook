@@ -5,6 +5,14 @@
 import OpenAI from 'openai';
 import { logger } from './logger';
 
+// sevDesk-compatible tax type values.
+// - default: DE Regelbesteuerung (7 % / 19 %)
+// - eu:      Innergemeinschaftliche Lieferung/Leistung (EU Reverse Charge)
+// - noteu:   Drittland / Ausfuhr
+// - ss:      Kleinunternehmer (§19 UStG) / Steuerfrei
+// - custom:  Abweichender / unklarer Satz
+export type TaxType = 'default' | 'eu' | 'noteu' | 'ss' | 'custom';
+
 export interface DocumentInfo {
   type: 'invoice' | 'order' | 'contract' | 'receipt' | 'none';
   confidence: number;
@@ -17,6 +25,8 @@ export interface DocumentInfo {
     dueDate?: string;
     contractPeriod?: string;
     items?: string[];
+    taxRate?: number;
+    taxType?: TaxType;
   };
   suggestedActions: string[];
 }
@@ -66,7 +76,9 @@ Analysiere die E-Mail und erkenne ob es sich um ein Geschaeftsdokument handelt.
     "orderNumber": "<Bestellnr. oder null>",
     "dueDate": "<Faelligkeitsdatum ISO oder null>",
     "contractPeriod": "<Vertragslaufzeit oder null>",
-    "items": ["<Artikel/Positionen>"]
+    "items": ["<Artikel/Positionen>"],
+    "taxRate": <Prozentsatz als Zahl, z.B. 19 oder 7, oder null>,
+    "taxType": "<default|eu|noteu|ss|custom oder null>"
   },
   "suggestedActions": ["forward_sharepoint", "forward_sevdesk", "forward_datev", "archive"]
 }
@@ -78,7 +90,21 @@ Analysiere die E-Mail und erkenne ob es sich um ein Geschaeftsdokument handelt.
   - invoice: ["forward_sevdesk", "forward_sharepoint", "archive"]
   - order: ["forward_sharepoint", "archive"]
   - contract: ["forward_sharepoint", "archive"]
-  - receipt: ["forward_sevdesk", "archive"]`;
+  - receipt: ["forward_sevdesk", "archive"]
+
+## USt-Erkennung (taxRate + taxType)
+Nur setzen wenn EINDEUTIG aus dem Text ableitbar, sonst null.
+- "default": Normale DE-Rechnung mit 19 % oder 7 % USt. Setze taxRate entsprechend.
+- "eu": Innergemeinschaftliche Lieferung/Leistung. Indikatoren: "Reverse Charge",
+  "Steuerschuldnerschaft des Leistungsempfaengers", "innergemeinschaftlich",
+  Lieferant mit EU-USt-IdNr. (nicht DE). taxRate = 0.
+- "noteu": Drittland (z.B. USA, CH, UK). Indikatoren: "Ausfuhrlieferung",
+  "Steuerfrei nach §6 UStG", Nicht-EU-Absender. taxRate = 0.
+- "ss": Kleinunternehmer. Indikator: "§19 UStG", "Kleinunternehmerregelung",
+  "Kein Ausweis von Umsatzsteuer". taxRate = 0.
+- "custom": Anderer Satz (z.B. 10.7 % Landwirtschaft, oesterreichische Rechnung mit 20 %).
+- Wenn Rechnung EUR und Steuer weder explizit noch ableitbar: taxType = "default",
+  taxRate = 19 (haeufigster Fall, wird in sevDesk vom User geprueft).`;
 
 export async function detectDocument(
   subject: string,
