@@ -3,6 +3,7 @@ import { MsalProvider, AuthenticatedTemplate, UnauthenticatedTemplate } from '@a
 import { PublicClientApplication } from '@azure/msal-browser';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { msalConfig } from './config/msalConfig';
+import { setMsalInstance } from './services/apiClient';
 import { Layout } from './components/layout/Layout';
 import { Landing } from './pages/Landing';
 import { Dashboard } from './pages/Dashboard';
@@ -11,11 +12,16 @@ import { Settings } from './pages/Settings';
 import { AdminConsent } from './pages/AdminConsent';
 import { Onboarding } from './pages/Onboarding';
 import { ToastProvider } from './components/ui/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { AuditLog } from './pages/AuditLog';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 
 // Initialize MSAL
 const msalInstance = new PublicClientApplication(msalConfig);
+
+// Share MSAL instance with API client for authenticated requests
+setMsalInstance(msalInstance);
 
 // Initialize React Query
 const queryClient = new QueryClient({
@@ -74,10 +80,11 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/mail" element={<MailClient />} />
+              <Route path="/dashboard" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+              <Route path="/mail" element={<ErrorBoundary><MailClient /></ErrorBoundary>} />
               <Route path="/inbox" element={<Navigate to="/mail" replace />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+              <Route path="/audit" element={<ErrorBoundary><AuditLog /></ErrorBoundary>} />
             </Route>
 
             {/* Fallback redirect */}

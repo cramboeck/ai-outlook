@@ -3,6 +3,9 @@
 
 import { Router } from 'express';
 import OpenAI from 'openai';
+import { validate } from '../middleware/validate';
+import { classifySchema, classifyBatchSchema, extractActionsSchema, generateReplySchema, suggestFolderSchema } from '../schemas/ai.schema';
+import { logger } from '../services/logger';
 
 const router = Router();
 
@@ -175,13 +178,9 @@ function formatEmailForPrompt(email: EmailInput, index: number): string {
 }
 
 // POST /api/classify - Single email classification
-router.post('/classify', async (req, res, next) => {
+router.post('/classify', validate(classifySchema), async (req, res, next) => {
   try {
     const { subject, body, sender, context, categories } = req.body;
-
-    if (!subject && !body) {
-      return res.status(400).json({ error: 'Subject or body is required' });
-    }
 
     const client = getOpenAIClient();
     const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -223,24 +222,16 @@ router.post('/classify', async (req, res, next) => {
     const result = JSON.parse(content);
     res.json(result);
   } catch (error) {
-    console.error('Classification error:', error);
+    logger.error('Classification error', { error: (error as Error).message, tenantId: req.tenantId });
     next(error);
   }
 });
 
 // POST /api/classify-batch - Batch email classification
-router.post('/classify-batch', async (req, res, next) => {
+router.post('/classify-batch', validate(classifyBatchSchema), async (req, res, next) => {
   try {
     const { emails, categories } = req.body;
     const startTime = Date.now();
-
-    if (!emails || !Array.isArray(emails) || emails.length === 0) {
-      return res.status(400).json({ error: 'Emails array is required and must not be empty' });
-    }
-
-    if (emails.length > 20) {
-      return res.status(400).json({ error: 'Maximum 20 emails per batch request' });
-    }
 
     const client = getOpenAIClient();
     const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -294,19 +285,15 @@ router.post('/classify-batch', async (req, res, next) => {
       processingTimeMs,
     });
   } catch (error) {
-    console.error('Batch classification error:', error);
+    logger.error('Batch classification error', { error: (error as Error).message, tenantId: req.tenantId });
     next(error);
   }
 });
 
 // POST /api/extract-actions - Extract actions from email
-router.post('/extract-actions', async (req, res, next) => {
+router.post('/extract-actions', validate(extractActionsSchema), async (req, res, next) => {
   try {
     const { subject, body, sender } = req.body;
-
-    if (!body) {
-      return res.status(400).json({ error: 'Body is required' });
-    }
 
     const client = getOpenAIClient();
     const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -351,19 +338,15 @@ Wenn keine Aktionen erkennbar sind, gib ein leeres Array zurück.`;
     const result = JSON.parse(content);
     res.json(result);
   } catch (error) {
-    console.error('Extract actions error:', error);
+    logger.error('Extract actions error', { error: (error as Error).message, tenantId: req.tenantId });
     next(error);
   }
 });
 
 // POST /api/generate-reply - Generate email reply
-router.post('/generate-reply', async (req, res, next) => {
+router.post('/generate-reply', validate(generateReplySchema), async (req, res, next) => {
   try {
     const { subject, body, sender, replyType, userName, additionalContext } = req.body;
-
-    if (!body) {
-      return res.status(400).json({ error: 'Body is required' });
-    }
 
     const client = getOpenAIClient();
     const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -423,19 +406,15 @@ Schreibe eine professionelle Antwort auf die E-Mail.
     const result = JSON.parse(content);
     res.json(result);
   } catch (error) {
-    console.error('Generate reply error:', error);
+    logger.error('Generate reply error', { error: (error as Error).message, tenantId: req.tenantId });
     next(error);
   }
 });
 
 // POST /api/suggest-folder - Suggest folder for email
-router.post('/suggest-folder', async (req, res, next) => {
+router.post('/suggest-folder', validate(suggestFolderSchema), async (req, res, next) => {
   try {
     const { subject, body, sender, folders } = req.body;
-
-    if (!folders || !Array.isArray(folders)) {
-      return res.status(400).json({ error: 'Folders array is required' });
-    }
 
     const client = getOpenAIClient();
     const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -477,7 +456,7 @@ ${folderList}
     const result = JSON.parse(content);
     res.json(result);
   } catch (error) {
-    console.error('Suggest folder error:', error);
+    logger.error('Suggest folder error', { error: (error as Error).message, tenantId: req.tenantId });
     next(error);
   }
 });

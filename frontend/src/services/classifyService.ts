@@ -1,7 +1,6 @@
 import type { Classification, BatchClassificationResult, ClassifyRequest, BatchClassifyRequest, Email, EmailContext } from '../types';
 import { getActiveCategories } from './categoryService';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7071/api';
+import { api } from './apiClient';
 
 // Convert Category to CategoryDefinition for API
 const getCategoriesForApi = () => {
@@ -79,32 +78,18 @@ export const extractBatchEmailContext = (
 };
 
 export const classifyEmail = async (request: ClassifyRequest): Promise<Classification> => {
-  const response = await fetch(`${API_URL}/classify`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      ...request,
-      categories: getCategoriesForApi(),
-    }),
+  const result = await api.post<Record<string, unknown>>('/classify', {
+    ...request,
+    categories: getCategoriesForApi(),
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Classification failed: ${error}`);
-  }
-
-  const result = await response.json();
-
-  // Ensure backwards compatibility - add default values if missing
   return {
-    category: result.category,
-    confidence: result.confidence,
-    reasoning: result.reasoning,
-    urgency: result.urgency || 'medium',
-    suggestedAction: result.suggestedAction,
-    signals: result.signals || {
+    category: result.category as string,
+    confidence: result.confidence as number,
+    reasoning: result.reasoning as string,
+    urgency: (result.urgency as string) || 'medium',
+    suggestedAction: result.suggestedAction as string | undefined,
+    signals: (result.signals as Classification['signals']) || {
       isActionRequired: false,
       hasDeadline: false,
       isAutomated: false,
@@ -115,33 +100,18 @@ export const classifyEmail = async (request: ClassifyRequest): Promise<Classific
 export const classifyEmailBatch = async (
   request: BatchClassifyRequest
 ): Promise<BatchClassificationResult> => {
-  // Enrich emails with context
   const enrichedEmails = extractBatchEmailContext(
     request.emails.map(e => ({
       ...e,
-      hasAttachments: false, // Would need this from the Email object
+      hasAttachments: false,
     }))
   );
 
-  const response = await fetch(`${API_URL}/classify-batch`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      emails: enrichedEmails,
-      categories: getCategoriesForApi(),
-    }),
+  const result = await api.post<{ results: any[]; totalTokens: number; processingTimeMs: number }>('/classify-batch', {
+    emails: enrichedEmails,
+    categories: getCategoriesForApi(),
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Batch classification failed: ${error}`);
-  }
-
-  const result = await response.json();
-
-  // Ensure backwards compatibility
   return {
     results: (result.results || []).map((r: any) => ({
       id: r.id,

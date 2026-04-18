@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { sanitizeHtml } from '../../utils/sanitize';
 import {
   X,
   Reply,
@@ -248,7 +249,7 @@ export const EmailDetail = ({
               fullEmail.body.contentType === 'html' ? (
                 <div
                   className="prose prose-sm max-w-none email-content"
-                  dangerouslySetInnerHTML={{ __html: fullEmail.body.content }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(fullEmail.body.content) }}
                 />
               ) : (
                 <pre className="whitespace-pre-wrap font-sans text-sm text-text">

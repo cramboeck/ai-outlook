@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Reply, Trash2, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from '../../utils/date';
+import { sanitizeHtml } from '../../utils/sanitize';
 import { CategoryBadge } from '../email/CategoryBadge';
 import { ReplyModal } from '../email/ReplyModal';
 import { getEmailWithBody, replyToEmail, deleteEmail } from '../../services/graphService';
@@ -182,7 +183,7 @@ export const RecentActivity = ({ emails, maxItems = 10, title, onRefresh }: Rece
                         <div
                           className="email-content text-sm text-text"
                           dangerouslySetInnerHTML={{
-                            __html: fullEmail.body?.content || fullEmail.bodyPreview || '',
+                            __html: sanitizeHtml(fullEmail.body?.content || fullEmail.bodyPreview || ''),
                           }}
                         />
                       </div>
