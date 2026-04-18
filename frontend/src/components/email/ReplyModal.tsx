@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Loader2, Sparkles, Send, Copy, Check, RefreshCw } from 'lucide-react';
 import type { Email } from '../../types';
 import {
@@ -9,6 +9,13 @@ import {
 } from '../../services/replyService';
 import type { ReplyTone, ReplyIntent, GenerateReplyResponse } from '../../services/replyService';
 import { getStoredSignature } from '../../pages/Settings';
+import {
+  getLatestDraft,
+  generateDraft,
+  CopilotUnavailableError,
+} from '../../services/copilotService';
+import type { CopilotDraftDto } from '../../services/copilotService';
+import { CopilotDraftPanel } from '../CopilotDraftPanel';
 
 interface ReplyModalProps {
   isOpen: boolean;
@@ -33,6 +40,68 @@ export const ReplyModal = ({
   const [editedReply, setEditedReply] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Copilot premium draft
+  const [copilotDraft, setCopilotDraft] = useState<CopilotDraftDto | null>(null);
+  const [isRegeneratingCopilot, setIsRegeneratingCopilot] = useState(false);
+  const [copilotError, setCopilotError] = useState<string | null>(null);
+
+  // Load existing draft (generated in the background by the pipeline) when
+  // the modal opens. Silent when no draft exists — premium feature is opt-in.
+  useEffect(() => {
+    if (!isOpen) {
+      setCopilotDraft(null);
+      setCopilotError(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const draft = await getLatestDraft(email.id);
+        if (!cancelled) setCopilotDraft(draft);
+      } catch {
+        // Non-critical — panel simply won't render.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, email.id]);
+
+  const handleCopilotRegenerate = async () => {
+    setIsRegeneratingCopilot(true);
+    setCopilotError(null);
+    try {
+      const fresh = await generateDraft({
+        emailId: email.id,
+        emailSubject: email.subject,
+        emailBody: email.body?.content || email.bodyPreview,
+        emailSender: email.from.emailAddress.address,
+        userName,
+      });
+      setCopilotDraft(fresh);
+    } catch (err) {
+      if (err instanceof CopilotUnavailableError) {
+        setCopilotError(err.message);
+      } else {
+        setCopilotError(err instanceof Error ? err.message : 'Neu generieren fehlgeschlagen');
+      }
+    } finally {
+      setIsRegeneratingCopilot(false);
+    }
+  };
+
+  const handleCopilotApply = (text: string) => {
+    const signature = getStoredSignature();
+    setEditedReply(signature ? `${text}\n\n${signature}` : text);
+    // Synthesize a GenerateReplyResponse so the footer / send flow works.
+    setResult({
+      subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+      reply: text,
+      suggestions: [],
+      tokens: 0,
+    });
+  };
 
   if (!isOpen) return null;
 
@@ -112,6 +181,17 @@ export const ReplyModal = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Copilot premium draft (if available for this email) */}
+          {copilotDraft && (
+            <CopilotDraftPanel
+              draft={copilotDraft}
+              isRegenerating={isRegeneratingCopilot}
+              error={copilotError}
+              onRegenerate={handleCopilotRegenerate}
+              onApply={handleCopilotApply}
+            />
+          )}
+
           {/* Step 1: Tone Selection */}
           <div>
             <h3 className="text-sm font-medium text-text mb-3">
