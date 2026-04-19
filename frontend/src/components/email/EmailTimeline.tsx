@@ -160,7 +160,7 @@ export const EmailTimeline = ({ emailId, reloadKey }: Props) => {
                     </span>
                     <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
                       {meta.label}
-                      <span className="ml-2 font-normal normal-case text-[10px] text-text-secondary/70">
+                      <span className="ml-2 font-normal normal-case text-xs text-text-secondary/70">
                         {formatDistanceToNow(event.created_at)}
                       </span>
                     </div>

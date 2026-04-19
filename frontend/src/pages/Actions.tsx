@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   RefreshCw,
   Search,
@@ -26,6 +26,12 @@ import { initGraphClient, getAllTodoTasks, createTodoTask } from '../services/gr
 // Types
 // ---------------------------------------------------------------------------
 
+interface Subtask {
+  id: string;
+  displayName: string;
+  isChecked: boolean;
+}
+
 interface Action {
   id: string;
   email_id: string;
@@ -40,6 +46,8 @@ interface Action {
   forwarded_to?: string;
   source?: string;
   ms_todo_id?: string;
+  ms_todo_list_id?: string;
+  subtasks?: Subtask[] | string;
   created_at: string;
   updated_at: string;
 }
@@ -276,6 +284,11 @@ export function Actions() {
           createdDateTime: t.createdDateTime,
           lastModifiedDateTime: t.lastModifiedDateTime,
           categories: t.categories,
+          checklistItems: t.checklistItems?.map(c => ({
+            id: c.id,
+            displayName: c.displayName,
+            isChecked: c.isChecked,
+          })),
         })),
       });
 
@@ -517,6 +530,103 @@ export function Actions() {
     return null;
   };
 
+  // Parse the JSONB subtasks column — Postgres returns it already expanded
+  // when used via the driver, but the frontend cache path can stringify it.
+  const parseSubtasks = (raw: Action['subtasks']): Subtask[] => {
+    if (!raw) return [];
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch { return []; }
+    }
+    return raw;
+  };
+
+  const togglingSubtasks = useRef(new Set<string>());
+  const [_, forceRender] = useState(0);
+
+  const toggleSubtask = async (action: Action, sub: Subtask) => {
+    if (!action.ms_todo_id || !action.ms_todo_list_id) {
+      // Local-only subtask toggling is future work. Without a Graph id we
+      // would silently lose the state on next sync.
+      return;
+    }
+    const key = `${action.id}:${sub.id}`;
+    if (togglingSubtasks.current.has(key)) return;
+    togglingSubtasks.current.add(key);
+    forceRender(x => x + 1);
+
+    const nextChecked = !sub.isChecked;
+
+    // Optimistic UI: flip locally first, then write-through to Graph + DB.
+    setActions(prev => prev.map(a => {
+      if (a.id !== action.id) return a;
+      const subs = parseSubtasks(a.subtasks).map(s =>
+        s.id === sub.id ? { ...s, isChecked: nextChecked } : s
+      );
+      return { ...a, subtasks: subs };
+    }));
+
+    try {
+      // 1. Push to Microsoft Graph
+      if (!accounts?.[0]) throw new Error('Nicht angemeldet');
+      const tokenResp = await instance.acquireTokenSilent({
+        ...todoScopes,
+        account: accounts[0],
+      });
+      initGraphClient(tokenResp.accessToken);
+      const { updateTodoChecklistItem } = await import('../services/graphService');
+      await updateTodoChecklistItem(action.ms_todo_list_id, action.ms_todo_id, sub.id, nextChecked);
+
+      // 2. Persist on our side so the next page-load is consistent.
+      await api.patch(`/todo/action/${action.id}/subtask/${sub.id}`, { isChecked: nextChecked });
+    } catch (err) {
+      // Roll back the optimistic change.
+      setActions(prev => prev.map(a => {
+        if (a.id !== action.id) return a;
+        const subs = parseSubtasks(a.subtasks).map(s =>
+          s.id === sub.id ? { ...s, isChecked: sub.isChecked } : s
+        );
+        return { ...a, subtasks: subs };
+      }));
+      console.error('Subtask toggle failed:', err);
+    } finally {
+      togglingSubtasks.current.delete(key);
+      forceRender(x => x + 1);
+    }
+  };
+
+  const renderSubtasks = (action: Action) => {
+    const subs = parseSubtasks(action.subtasks);
+    if (subs.length === 0) return null;
+    const done = subs.filter(s => s.isChecked).length;
+    return (
+      <div className="mb-3 pl-2 border-l-2 border-blue-200 dark:border-blue-800">
+        <div className="text-xs text-text-secondary mb-1.5">
+          Unteraufgaben ({done} / {subs.length})
+        </div>
+        <ul className="space-y-1">
+          {subs.map(sub => {
+            const key = `${action.id}:${sub.id}`;
+            const isToggling = togglingSubtasks.current.has(key);
+            return (
+              <li key={sub.id} className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={sub.isChecked}
+                  disabled={isToggling}
+                  onChange={() => toggleSubtask(action, sub)}
+                  className="mt-0.5 cursor-pointer accent-primary"
+                />
+                <span className={`flex-1 ${sub.isChecked ? 'line-through text-text-secondary' : 'text-text'}`}>
+                  {sub.displayName}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  };
+
   const renderActionCard = (action: Action) => {
     const overdue = action.status !== 'done' && action.status !== 'dismissed' && isOverdue(action.deadline);
     const notesExpanded = expandedNotes.has(action.id);
@@ -548,6 +658,9 @@ export function Actions() {
 
         {/* Description */}
         <p className="text-sm text-text font-medium mb-2">{action.description}</p>
+
+        {/* Subtasks (from MS To-Do checklistItems) */}
+        {renderSubtasks(action)}
 
         {/* Email subject */}
         {action.email_subject && (

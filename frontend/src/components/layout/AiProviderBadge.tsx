@@ -55,12 +55,12 @@ export const AiProviderBadge = () => {
       <div className="min-w-0 flex-1">
         <div className="font-medium truncate">{LABEL[info.provider]}</div>
         {info.model && (
-          <div className="font-mono text-[10px] opacity-75 truncate">{info.model}</div>
+          <div className="font-mono text-xs opacity-75 truncate">{info.model}</div>
         )}
       </div>
       {info.copilotObo && (
         <span
-          className="flex-shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-white/60"
+          className="flex-shrink-0 text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-white/60"
           title="Copilot-OBO-Flow ist konfiguriert"
         >
           Copilot

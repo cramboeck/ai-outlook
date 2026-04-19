@@ -653,6 +653,14 @@ export interface TodoTaskList {
   wellknownListName?: string; // 'defaultList', 'flaggedEmails', etc.
 }
 
+export interface TodoChecklistItem {
+  id: string;
+  displayName: string;
+  isChecked: boolean;
+  createdDateTime?: string;
+  checkedDateTime?: string | null;
+}
+
 export interface TodoTask {
   id: string;
   title: string;
@@ -671,6 +679,7 @@ export interface TodoTask {
     applicationName: string;
     displayName: string;
   }>;
+  checklistItems?: TodoChecklistItem[];
 }
 
 // Get all To-Do lists
@@ -694,14 +703,14 @@ export const getTodoTasks = async (
   includeCompleted: boolean = false
 ): Promise<TodoTask[]> => {
   const client = getGraphClient();
-  // Note: linkedResources is a navigation property — Graph rejects it inside
-  // $select with a 400 ("Invalid request"). It has to be requested via
-  // $expand instead. We also drop $select entirely on the scalar fields:
-  // payloads stay small and any future field addition (e.g. recurrence)
-  // requires no client change.
+  // Note: linkedResources + checklistItems are navigation properties — Graph
+  // rejects them inside $select with a 400 ("Invalid request"). Both have to
+  // be requested via $expand instead. We also drop $select entirely on the
+  // scalar fields: payloads stay small and any future field addition (e.g.
+  // recurrence) requires no client change.
   let request = client
     .api(`/me/todo/lists/${listId}/tasks`)
-    .expand('linkedResources')
+    .expand('linkedResources,checklistItems')
     .top(top)
     .orderby('createdDateTime desc');
 
@@ -729,6 +738,20 @@ export const getAllTodoTasks = async (includeCompleted: boolean = false): Promis
   }
 
   return { lists, tasks: allTasks };
+};
+
+// Toggle a single checklist item (subtask) on a To-Do task. Updates the
+// isChecked flag in Microsoft Graph. Returns the updated item.
+export const updateTodoChecklistItem = async (
+  listId: string,
+  taskId: string,
+  checklistItemId: string,
+  isChecked: boolean
+): Promise<TodoChecklistItem> => {
+  const client = getGraphClient();
+  return await client
+    .api(`/me/todo/lists/${listId}/tasks/${taskId}/checklistItems/${checklistItemId}`)
+    .patch({ isChecked });
 };
 
 // Create a task in a To-Do list

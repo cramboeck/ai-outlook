@@ -77,7 +77,7 @@ export const CopilotDraftPanel = ({
           <div>
             <div className="flex items-center gap-2">
               <h4 className="text-sm font-semibold text-indigo-900">Context-Aware Draft</h4>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-semibold uppercase tracking-wide">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-600 text-white text-xs font-semibold uppercase tracking-wide">
                 Powered by Copilot
               </span>
             </div>
@@ -174,7 +174,7 @@ const CitationRow = ({ citation }: { citation: CopilotCitation }) => {
   const label = SOURCE_LABEL[citation.source] ?? 'Dokument';
   const body = (
     <div className="flex items-start gap-2 py-1.5 px-2 rounded-md hover:bg-indigo-50 transition-colors">
-      <span className="flex-shrink-0 mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">
+      <span className="flex-shrink-0 mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded bg-indigo-100 text-indigo-700 text-xs font-bold">
         {citation.index}
       </span>
       <Icon className="flex-shrink-0 w-4 h-4 text-indigo-600 mt-0.5" />

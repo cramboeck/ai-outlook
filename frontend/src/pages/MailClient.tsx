@@ -525,7 +525,7 @@ export const MailClient = () => {
       {/* Subtle hint badge in corner so users discover ?  */}
       <button
         onClick={() => setIsShortcutHelpOpen(true)}
-        className="fixed bottom-4 right-4 z-40 text-[11px] text-text-secondary bg-white/80 backdrop-blur border border-border rounded-md px-2 py-1 hover:bg-white hover:text-text transition-colors shadow-sm"
+        className="fixed bottom-4 right-4 z-40 text-xs text-text-secondary bg-white/80 backdrop-blur border border-border rounded-md px-2 py-1 hover:bg-white hover:text-text transition-colors shadow-sm"
         title="Tastatur-Shortcuts anzeigen"
       >
         Shortcuts <kbd className="font-mono ml-1 px-1 rounded bg-gray-100 border border-gray-300">?</kbd>

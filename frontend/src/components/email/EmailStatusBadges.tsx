@@ -30,7 +30,7 @@ export const EmailStatusBadges = ({ status, hideClassified }: Props) => {
       <span
         key="action"
         title={`Offene Aufgabe${status.urgency ? ` (Priorität: ${status.urgency})` : ''}`}
-        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-semibold ${urgencyClass || 'text-amber-700 bg-amber-50 border-amber-200'}`}
+        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-xs font-semibold ${urgencyClass || 'text-amber-700 bg-amber-50 border-amber-200'}`}
       >
         <Zap className="w-3 h-3" />
         Aufgabe
@@ -43,7 +43,7 @@ export const EmailStatusBadges = ({ status, hideClassified }: Props) => {
       <span
         key="forwarded"
         title="Bereits an eine Integration weitergeleitet"
-        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200"
+        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-xs font-semibold text-emerald-700 bg-emerald-50 border-emerald-200"
       >
         <CheckCircle2 className="w-3 h-3" />
         Forwarded
@@ -56,7 +56,7 @@ export const EmailStatusBadges = ({ status, hideClassified }: Props) => {
       <span
         key="rule"
         title="Eine Regel hat auf diese E-Mail gematcht"
-        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-semibold text-violet-700 bg-violet-50 border-violet-200"
+        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-xs font-semibold text-violet-700 bg-violet-50 border-violet-200"
       >
         <Shield className="w-3 h-3" />
         Regel
@@ -69,7 +69,7 @@ export const EmailStatusBadges = ({ status, hideClassified }: Props) => {
       <span
         key="ai"
         title={status.category ? `KI-klassifiziert als „${status.category}"` : 'KI-klassifiziert'}
-        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-semibold text-indigo-700 bg-indigo-50 border-indigo-200"
+        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-xs font-semibold text-indigo-700 bg-indigo-50 border-indigo-200"
       >
         <Sparkles className="w-3 h-3" />
         KI

@@ -8,6 +8,12 @@ import { logger } from '../services/logger';
 
 const router = Router();
 
+interface TodoChecklistItem {
+  id: string;
+  displayName: string;
+  isChecked: boolean;
+}
+
 interface TodoTaskInput {
   id: string;           // Microsoft To-Do task ID
   listId: string;       // Microsoft To-Do list ID
@@ -20,6 +26,18 @@ interface TodoTaskInput {
   createdDateTime: string;
   lastModifiedDateTime: string;
   categories?: string[];
+  checklistItems?: TodoChecklistItem[];
+}
+
+// Serialise subtasks for storage. We keep the Graph ids so a later PATCH on
+// a single checklistItem can target the right resource.
+function serializeSubtasks(items: TodoChecklistItem[] | undefined): string {
+  if (!Array.isArray(items)) return '[]';
+  return JSON.stringify(items.map(i => ({
+    id: i.id,
+    displayName: i.displayName ?? '',
+    isChecked: !!i.isChecked,
+  })));
 }
 
 // Map Microsoft To-Do status to MailSort status
@@ -123,13 +141,15 @@ router.post('/sync', async (req, res, next) => {
                 priority = $2,
                 status = $3,
                 deadline = $4,
+                subtasks = $5::jsonb,
                 ms_todo_synced_at = NOW()
-              WHERE id = $5 AND tenant_id = $6`,
+              WHERE id = $6 AND tenant_id = $7`,
               [
                 task.title,
                 newPriority,
                 newStatus,
                 task.dueDateTime || null,
+                serializeSubtasks(task.checklistItems),
                 existing.id,
                 req.tenantId,
               ]
@@ -144,8 +164,8 @@ router.post('/sync', async (req, res, next) => {
         } else {
           // New task → import into MailSort
           await query(
-            `INSERT INTO actions (tenant_id, user_id, description, action_type, priority, status, deadline, source, ms_todo_id, ms_todo_list_id, ms_todo_synced_at, notes)
-             VALUES ($1, $2, $3, 'task', $4, $5, $6, 'ms_todo', $7, $8, NOW(), $9)`,
+            `INSERT INTO actions (tenant_id, user_id, description, action_type, priority, status, deadline, source, ms_todo_id, ms_todo_list_id, ms_todo_synced_at, notes, subtasks)
+             VALUES ($1, $2, $3, 'task', $4, $5, $6, 'ms_todo', $7, $8, NOW(), $9, $10::jsonb)`,
             [
               req.tenantId,
               internalUserId,
@@ -156,6 +176,7 @@ router.post('/sync', async (req, res, next) => {
               task.id,
               task.listId,
               task.body || `Aus Microsoft To-Do Liste: ${task.listName}`,
+              serializeSubtasks(task.checklistItems),
             ]
           );
 
@@ -249,6 +270,47 @@ router.post('/push-confirm', async (req, res, next) => {
     }
 
     res.json({ updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/todo/action/:actionId/subtask/:subtaskId
+// Flips one stored subtask's isChecked flag. Called by the UI after the
+// Graph PATCH on the corresponding checklistItem succeeds, so the DB-side
+// action_subtasks stays in sync without a full re-sync round-trip.
+router.patch('/action/:actionId/subtask/:subtaskId', async (req, res, next) => {
+  try {
+    const { isChecked } = req.body as { isChecked?: boolean };
+    if (typeof isChecked !== 'boolean') {
+      return res.status(400).json({ error: 'isChecked (boolean) is required' });
+    }
+
+    const row = await queryOne<{ subtasks: unknown }>(
+      'SELECT subtasks FROM actions WHERE id = $1 AND tenant_id = $2',
+      [req.params.actionId, req.tenantId]
+    );
+    if (!row) {
+      return res.status(404).json({ error: 'Action not found' });
+    }
+
+    const current: Array<{ id: string; displayName: string; isChecked: boolean }> =
+      typeof row.subtasks === 'string' ? JSON.parse(row.subtasks) :
+        Array.isArray(row.subtasks) ? row.subtasks as any[] : [];
+
+    const idx = current.findIndex(s => s.id === req.params.subtaskId);
+    if (idx < 0) {
+      return res.status(404).json({ error: 'Subtask not found on this action' });
+    }
+
+    current[idx].isChecked = isChecked;
+
+    await query(
+      'UPDATE actions SET subtasks = $1::jsonb WHERE id = $2 AND tenant_id = $3',
+      [JSON.stringify(current), req.params.actionId, req.tenantId]
+    );
+
+    res.json({ subtasks: current });
   } catch (error) {
     next(error);
   }

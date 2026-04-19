@@ -73,7 +73,7 @@ export const CopilotSettings = () => {
           <div className="flex-1">
             <h2 className="text-lg font-semibold text-text flex items-center gap-2">
               Microsoft 365 Copilot
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-semibold uppercase tracking-wide">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-600 text-white text-xs font-semibold uppercase tracking-wide">
                 Premium
               </span>
             </h2>

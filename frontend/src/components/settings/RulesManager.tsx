@@ -819,7 +819,7 @@ export const RulesManager = () => {
                         <p className="font-medium text-text truncate">{rule.name}</p>
                         {serverIds.has(rule.id) && (
                           <span
-                            className="inline-flex items-center flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200"
+                            className="inline-flex items-center flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200"
                             title="Diese Regel wird serverseitig ausgefuehrt und ist fuer alle Geraete dieses Tenants aktiv."
                           >
                             Server
