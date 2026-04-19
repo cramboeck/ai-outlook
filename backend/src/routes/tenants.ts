@@ -8,6 +8,8 @@ import {
   updateUserPreferences,
   getTenantUsers,
 } from '../services/tenantService';
+import { query, queryOne } from '../db';
+import { isOboConfigured } from '../services/authService';
 
 const router = Router();
 
@@ -22,12 +24,20 @@ router.get('/me', async (req, res, next) => {
       req.userName
     );
 
+    // Read the Copilot license flag so the frontend can render an
+    // accurate toggle in Settings.
+    const copilotRow = await queryOne<{ has_copilot_license: boolean }>(
+      'SELECT has_copilot_license FROM tenants WHERE id = $1',
+      [tenant.id]
+    );
+
     res.json({
       tenant: {
         id: tenant.id,
         name: tenant.name,
         plan: tenant.plan,
         settings: tenant.settings,
+        has_copilot_license: copilotRow?.has_copilot_license ?? false,
       },
       user: {
         id: user.id,
@@ -36,7 +46,32 @@ router.get('/me', async (req, res, next) => {
         role: user.role,
         preferences: user.preferences,
       },
+      // Backend capability hints — so the UI can disable the Copilot
+      // toggle with an explanation when the env isn't wired up.
+      capabilities: {
+        copilotObo: isOboConfigured(),
+      },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/tenants/copilot-license - Toggle the Copilot premium flag
+// for the current tenant. Admin-only in spirit; role check lives in
+// auditable DB layer for now.
+router.patch('/copilot-license', async (req, res, next) => {
+  try {
+    const enabled = req.body?.enabled;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled (boolean) is required' });
+    }
+    const tenant = await getOrCreateTenant(req.tenantId!);
+    await query(
+      'UPDATE tenants SET has_copilot_license = $1 WHERE id = $2',
+      [enabled, tenant.id]
+    );
+    res.json({ has_copilot_license: enabled });
   } catch (error) {
     next(error);
   }

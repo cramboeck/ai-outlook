@@ -40,6 +40,7 @@ import {
   type FontSize,
 } from '../services/themeService';
 import { RulesManager } from '../components/settings/RulesManager';
+import { CopilotSettings } from '../components/settings/CopilotSettings';
 
 const SIGNATURE_STORAGE_KEY = 'postpilot_signature';
 
@@ -664,6 +665,9 @@ export const Settings = () => {
           )}
         </div>
       </div>
+
+      {/* Copilot Premium Section */}
+      <CopilotSettings />
 
       {/* Rules Section */}
       <RulesManager />
