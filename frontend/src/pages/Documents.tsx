@@ -323,7 +323,7 @@ export function Documents() {
         extracted: any;
         model: string;
         processingTimeMs: number;
-      }>('/process-extract-document', {
+      }>('/extract-document', {
         attachment: attachment || undefined,
         email_subject: selectedDoc.email_subject,
         email_sender: selectedDoc.email_sender,
