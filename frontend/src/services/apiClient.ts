@@ -12,7 +12,16 @@ export const setMsalInstance = (instance: PublicClientApplication) => {
   msalInstance = instance;
 };
 
-// Acquire access token silently, fallback to interactive
+// Acquire access token with a proper three-step fallback:
+//   1. Silent with our custom API audience scope (api://.../access_as_user)
+//   2. Silent with User.Read — covers tenants where the custom scope was
+//      never exposed via "Expose an API". Graph-audience tokens are also
+//      valid because our backend authMiddleware validates by Azure tenant.
+//   3. Interactive popup — triggered when both silents fail for any
+//      reason (expired refresh token, revoked session, MFA required,
+//      server 400 on the token endpoint). Without this, a single expired
+//      refresh-token made the whole app unusable until the user manually
+//      cleared storage.
 const getAccessToken = async (): Promise<string> => {
   if (!msalInstance) {
     throw new Error('MSAL instance not initialized. Call setMsalInstance first.');
@@ -23,22 +32,48 @@ const getAccessToken = async (): Promise<string> => {
     throw new Error('No authenticated account. Please log in.');
   }
 
+  const primaryScopes = [`api://${msalConfig.auth.clientId}/access_as_user`];
+  const fallbackScopes = ['User.Read'];
+
+  // Step 1 + 2: silent
   try {
     const result = await msalInstance.acquireTokenSilent({
-      scopes: [`api://${msalConfig.auth.clientId}/access_as_user`],
+      scopes: primaryScopes,
       account: accounts[0],
     });
     return result.accessToken;
-  } catch (error) {
-    if (error instanceof InteractionRequiredAuthError) {
-      // Fallback: use Graph token as bearer for backend
+  } catch {
+    // Primary audience not configured or expired — try Graph audience.
+    try {
       const result = await msalInstance.acquireTokenSilent({
-        scopes: ['User.Read'],
+        scopes: fallbackScopes,
         account: accounts[0],
       });
       return result.accessToken;
+    } catch (silentErr) {
+      // Step 3: both silents failed. Force interactive. This handles
+      // InteractionRequiredAuthError but also a hard server 400 on the
+      // token endpoint (expired refresh token, CA policy change, etc.).
+      const needsInteraction =
+        silentErr instanceof InteractionRequiredAuthError
+        || (silentErr as { errorCode?: string })?.errorCode === 'invalid_grant'
+        || (silentErr as { name?: string })?.name === 'ServerError'
+        || (silentErr as { message?: string })?.message?.includes('400');
+
+      if (!needsInteraction) throw silentErr;
+
+      try {
+        const popupResult = await msalInstance.acquireTokenPopup({
+          scopes: fallbackScopes,
+          account: accounts[0],
+        });
+        return popupResult.accessToken;
+      } catch (popupErr) {
+        throw new Error(
+          `Authentifizierung fehlgeschlagen. Bitte melde dich neu an. (${(popupErr as Error).message ?? 'unknown'})`
+        );
+      }
     }
-    throw error;
   }
 };
 
