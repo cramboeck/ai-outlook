@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sanitizeHtml } from '../../utils/sanitize';
+import { QuickForwardMenu } from '../email/QuickForwardMenu';
 import {
   X,
   Reply,
@@ -158,6 +159,7 @@ export const EmailDetail = ({
               Regel
             </button>
           )}
+          <QuickForwardMenu email={fullEmail || email} />
           {onAnalyze && (
             <button
               onClick={() => onAnalyze(fullEmail || email)}
