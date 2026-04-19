@@ -39,6 +39,11 @@ import {
   type RuleCriteria,
   type RuleAction,
 } from '../../services/rulesService';
+import {
+  fetchServerRules,
+  updateServerRule,
+  deleteServerRule,
+} from '../../services/rulesApiService';
 import { getMailFolders } from '../../services/graphService';
 import { buildFolderHierarchy, type FolderWithPath } from '../../services/folderService';
 import { getActiveCategories } from '../../services/categoryService';
@@ -475,6 +480,9 @@ const RuleEditModal = ({
 
 export const RulesManager = () => {
   const [rules, setRules] = useState<EmailRule[]>([]);
+  // Tracks which rule ids originate from the server-side rules table so CRUD
+  // can route to /api/rules for those and stay on localStorage for the rest.
+  const [serverIds, setServerIds] = useState<Set<string>>(new Set());
   const [autoRun, setAutoRun] = useState(true);
   const [folders, setFolders] = useState<FolderWithPath[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -484,9 +492,28 @@ export const RulesManager = () => {
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Merge local + server rules. Server wins on id collision (canonical source
+  // for everything created via Smart-Rules or the backend). Local-only rules
+  // stay listed as usual.
+  const reloadAllRules = async () => {
+    const local = loadRules();
+    setRules(local);
+    try {
+      const server = await fetchServerRules();
+      const serverIdSet = new Set(server.map(r => r.id));
+      setServerIds(serverIdSet);
+      const byId = new Map<string, EmailRule>();
+      for (const r of local) byId.set(r.id, r);
+      for (const r of server) byId.set(r.id, r);
+      setRules(Array.from(byId.values()).sort((a, b) => a.priority - b.priority));
+    } catch {
+      // Server unreachable → stick with local only.
+    }
+  };
+
   // Load data on mount
   useEffect(() => {
-    setRules(loadRules());
+    void reloadAllRules();
     setAutoRun(isAutoRunEnabled());
     setCategories(getActiveCategories());
 
@@ -522,43 +549,88 @@ export const RulesManager = () => {
     setShowEditModal(true);
   };
 
-  const handleSaveRule = (ruleData: Partial<EmailRule>) => {
-    if (isNewRule) {
-      createRule(
-        ruleData.name!,
-        ruleData.criteria!,
-        ruleData.actions!,
-        {
-          description: ruleData.description,
-          enabled: ruleData.enabled,
-          stopProcessing: ruleData.stopProcessing,
+  const handleSaveRule = async (ruleData: Partial<EmailRule>) => {
+    try {
+      if (isNewRule) {
+        createRule(
+          ruleData.name!,
+          ruleData.criteria!,
+          ruleData.actions!,
+          {
+            description: ruleData.description,
+            enabled: ruleData.enabled,
+            stopProcessing: ruleData.stopProcessing,
+          }
+        );
+        showMessage('success', 'Regel erstellt');
+      } else if (editingRule) {
+        if (serverIds.has(editingRule.id)) {
+          await updateServerRule(editingRule.id, ruleData);
+        } else {
+          updateRule(editingRule.id, ruleData);
         }
-      );
-      showMessage('success', 'Regel erstellt');
-    } else if (editingRule) {
-      updateRule(editingRule.id, ruleData);
-      showMessage('success', 'Regel aktualisiert');
+        showMessage('success', 'Regel aktualisiert');
+      }
+      await reloadAllRules();
+      setShowEditModal(false);
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
     }
-    setRules(loadRules());
-    setShowEditModal(false);
   };
 
-  const handleDeleteRule = (id: string) => {
-    if (confirm('Möchten Sie diese Regel wirklich löschen?')) {
-      deleteRule(id);
-      setRules(loadRules());
+  const handleDeleteRule = async (id: string) => {
+    if (!confirm('Möchten Sie diese Regel wirklich löschen?')) return;
+    try {
+      if (serverIds.has(id)) {
+        await deleteServerRule(id);
+      } else {
+        deleteRule(id);
+      }
+      await reloadAllRules();
       showMessage('success', 'Regel gelöscht');
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : 'Löschen fehlgeschlagen');
     }
   };
 
-  const handleToggleRule = (id: string) => {
-    toggleRule(id);
-    setRules(loadRules());
+  const handleToggleRule = async (id: string) => {
+    if (serverIds.has(id)) {
+      // Server rule: find current enabled state and flip
+      const rule = rules.find(r => r.id === id);
+      if (!rule) return;
+      try {
+        await updateServerRule(id, { enabled: !rule.enabled });
+        await reloadAllRules();
+      } catch (err) {
+        showMessage('error', err instanceof Error ? err.message : 'Umschalten fehlgeschlagen');
+      }
+    } else {
+      toggleRule(id);
+      setRules(loadRules());
+    }
   };
 
   const handleDuplicateRule = (id: string) => {
-    duplicateRule(id);
-    setRules(loadRules());
+    // Duplicates stay local for now. If the source was a server rule we
+    // still fork it into localStorage so the user can tweak it safely.
+    const rule = rules.find(r => r.id === id);
+    if (!rule) return;
+    if (serverIds.has(id)) {
+      createRule(
+        `${rule.name} (Kopie)`,
+        rule.criteria,
+        rule.actions,
+        {
+          description: rule.description,
+          enabled: rule.enabled,
+          stopProcessing: rule.stopProcessing,
+        }
+      );
+      void reloadAllRules();
+    } else {
+      duplicateRule(id);
+      setRules(loadRules());
+    }
     showMessage('success', 'Regel dupliziert');
   };
 
@@ -743,7 +815,17 @@ export const RulesManager = () => {
                       }
                       className="text-left w-full"
                     >
-                      <p className="font-medium text-text truncate">{rule.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-text truncate">{rule.name}</p>
+                        {serverIds.has(rule.id) && (
+                          <span
+                            className="inline-flex items-center flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200"
+                            title="Diese Regel wird serverseitig ausgefuehrt und ist fuer alle Geraete dieses Tenants aktiv."
+                          >
+                            Server
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-text-secondary truncate">
                         {getActionSummary(rule.actions)}
                       </p>
