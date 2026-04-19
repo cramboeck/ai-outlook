@@ -66,11 +66,30 @@ export interface SuggestedCriterion {
   enabled: boolean;
 }
 
-export type SuggestedActionType = 'categorize' | 'move' | 'markRead' | 'flag';
+export type SuggestedActionType =
+  | 'categorize'
+  | 'move'
+  | 'markRead'
+  | 'markUnread'
+  | 'flag'
+  | 'unflag'
+  | 'delete'
+  | 'extractActions'
+  | 'forwardToDms';
+
+export type SuggestedIntegrationType =
+  | 'sevdesk'
+  | 'paperless'
+  | 'sharepoint'
+  | 'webhook'
+  | 'datev';
 
 export interface SuggestedAction {
   type: SuggestedActionType;
   value: string;
+  /** Only meaningful when type='forwardToDms' — the LLM's hint about which
+   *  integration fits the document class best. */
+  integrationType?: SuggestedIntegrationType;
   description: string;
   enabled: boolean;
 }

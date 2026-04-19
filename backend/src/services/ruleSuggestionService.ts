@@ -29,11 +29,22 @@ export type SuggestedActionType =
   | 'categorize'
   | 'move'
   | 'markRead'
-  | 'flag';
+  | 'markUnread'
+  | 'flag'
+  | 'unflag'
+  | 'delete'
+  | 'extractActions'
+  | 'forwardToDms';
 
 export interface SuggestedAction {
   type: SuggestedActionType;
+  /** For categorize: category name. For move: folder name. For forwardToDms:
+   *  the integration's display name (resolved to integrationId client-side). */
   value: string;
+  /** Optional integration hint: when type='forwardToDms', this carries the
+   *  preferred integration type ('sevdesk' | 'paperless' | 'sharepoint' |
+   *  'webhook'). The frontend picks the matching active integration. */
+  integrationType?: 'sevdesk' | 'paperless' | 'sharepoint' | 'webhook' | 'datev';
   description: string;
   enabled: boolean;
 }
@@ -84,9 +95,14 @@ Generalisiere klug: finde die aussagekraeftigsten, wiederverwendbaren Muster. Li
 
 ## Verfuegbare Aktionen
 - **categorize**: Kategorie zuweisen (value = Kategoriename aus der Liste unten)
-- **move**: In Ordner verschieben (value = Ordnername)
+- **move**: In Ordner verschieben (value = Ordnername, z.B. "Archiv")
 - **markRead**: Als gelesen markieren
+- **markUnread**: Als ungelesen markieren
 - **flag**: Mit Follow-up-Flag markieren
+- **unflag**: Follow-up-Flag entfernen
+- **delete**: In den Papierkorb verschieben — NUR bei eindeutigen Spam-/Werbe-Patterns verwenden
+- **extractActions**: KI-Pipeline triggern (erzeugt Aufgaben + erkennt Dokumente). Nutzen bei Rechnungen / Bestellungen / Anfragen.
+- **forwardToDms**: Automatisch an eine DMS-Integration weiterleiten. value = "Rechnung" / "Bestellung" / "Dokument" etc. Setze zusaetzlich integrationType auf "sevdesk" (Rechnungen), "paperless" (Archiv-relevant), "sharepoint" (Team-Sichtbarkeit) oder "webhook" (Teams-Benachrichtigung).
 
 ## Heuristiken
 - Domain > ContainsSubject > BodyContains (in dieser Reihenfolge bevorzugen).
@@ -180,8 +196,10 @@ const VALID_CRITERIA_FIELDS: SuggestedCriterionField[] = [
   'subjectStartsWith', 'bodyContains', 'hasAttachments', 'importance',
 ];
 const VALID_ACTION_TYPES: SuggestedActionType[] = [
-  'categorize', 'move', 'markRead', 'flag',
+  'categorize', 'move', 'markRead', 'markUnread',
+  'flag', 'unflag', 'delete', 'extractActions', 'forwardToDms',
 ];
+const VALID_INTEGRATION_TYPES = ['sevdesk', 'paperless', 'sharepoint', 'webhook', 'datev'];
 
 /**
  * Defensive sanitisation: the LLM sometimes returns extra / misspelled fields
@@ -208,11 +226,18 @@ function sanitizeSuggestion(s: RuleSuggestion, input: SuggestRuleInput): void {
 
   s.actions = (Array.isArray(s.actions) ? s.actions : [])
     .filter(a => a && VALID_ACTION_TYPES.includes(a.type))
-    .map(a => ({
-      type: a.type,
-      value: String(a.value ?? '').slice(0, 200),
-      description: (a.description ?? '').slice(0, 300),
-      enabled: a.enabled !== false,
-    }))
+    .map(a => {
+      const integrationType =
+        a.integrationType && VALID_INTEGRATION_TYPES.includes(a.integrationType)
+          ? a.integrationType
+          : undefined;
+      return {
+        type: a.type,
+        value: String(a.value ?? '').slice(0, 200),
+        integrationType,
+        description: (a.description ?? '').slice(0, 300),
+        enabled: a.enabled !== false,
+      };
+    })
     .slice(0, 4);
 }

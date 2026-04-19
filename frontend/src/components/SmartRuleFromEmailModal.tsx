@@ -25,6 +25,10 @@ import type {
   SuggestedAction,
 } from '../services/rulesApiService';
 import type { RuleCriteria, RuleAction } from '../services/rulesService';
+import {
+  fetchActiveIntegrations,
+} from '../services/quickForwardService';
+import type { Integration } from '../services/quickForwardService';
 
 interface Props {
   isOpen: boolean;
@@ -48,8 +52,18 @@ const ACTION_LABEL: Record<SuggestedAction['type'], string> = {
   categorize: 'Kategorisieren',
   move: 'Verschieben nach',
   markRead: 'Als gelesen markieren',
+  markUnread: 'Als ungelesen markieren',
   flag: 'Follow-up markieren',
+  unflag: 'Follow-up entfernen',
+  delete: 'In Papierkorb verschieben',
+  extractActions: 'KI-Analyse + Aufgaben',
+  forwardToDms: 'An Integration weiterleiten',
 };
+
+/** Actions that need no further value: just toggle the checkbox. */
+const PARAMETERLESS_ACTIONS = new Set<SuggestedAction['type']>([
+  'markRead', 'markUnread', 'flag', 'unflag', 'delete', 'extractActions',
+]);
 
 export const SmartRuleFromEmailModal = ({
   isOpen,
@@ -58,6 +72,9 @@ export const SmartRuleFromEmailModal = ({
   onCreated,
 }: Props) => {
   const [suggestion, setSuggestion] = useState<RuleSuggestion | null>(null);
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  /** Per-action-index the integration id picked when type === 'forwardToDms'. */
+  const [actionIntegrationIds, setActionIntegrationIds] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -74,6 +91,15 @@ export const SmartRuleFromEmailModal = ({
     setLoading(true);
     setError(null);
     setSuggestion(null);
+    setActionIntegrationIds({});
+
+    // Load active integrations in parallel — needed for the forwardToDms
+    // action to offer a concrete target to the user. Failure is silent; the
+    // action will simply render a "keine Integration" placeholder.
+    fetchActiveIntegrations()
+      .then(list => { if (!cancelled) setIntegrations(list); })
+      .catch(() => { /* non-critical */ });
+
     // Strip HTML + collapse whitespace + clamp to 5 000 chars. The backend
     // prompt only uses the first ~1 500 anyway; sending the raw HTML of a
     // newsletter would blow past the server-side input limit.
@@ -151,7 +177,7 @@ export const SmartRuleFromEmailModal = ({
     setError(null);
     try {
       const criteria = buildRuleCriteria(suggestion.criteria);
-      const actions = buildRuleActions(suggestion.actions);
+      const actions = buildRuleActions(suggestion.actions, actionIntegrationIds, integrations);
       await createServerRule({
         name: name.trim(),
         description: description.trim(),
@@ -335,8 +361,40 @@ export const SmartRuleFromEmailModal = ({
                             disabled={!a.enabled}
                             className="w-full px-2 py-1.5 border border-border rounded text-sm bg-white"
                           />
+                        ) : a.type === 'forwardToDms' ? (
+                          integrations.length === 0 ? (
+                            <div className="text-sm text-amber-700">
+                              Keine aktive Integration konfiguriert. Diese Aktion wird nicht ausgefuehrt.
+                            </div>
+                          ) : (
+                            <select
+                              value={
+                                actionIntegrationIds[idx]
+                                ?? integrations.find(i => i.type === a.integrationType)?.id
+                                ?? integrations[0]?.id
+                                ?? ''
+                              }
+                              onChange={(e) => setActionIntegrationIds(prev => ({ ...prev, [idx]: e.target.value }))}
+                              disabled={!a.enabled}
+                              className="w-full px-2 py-1.5 border border-border rounded text-sm bg-white"
+                            >
+                              {integrations.map(i => (
+                                <option key={i.id} value={i.id}>
+                                  {i.name} ({i.type})
+                                </option>
+                              ))}
+                            </select>
+                          )
+                        ) : PARAMETERLESS_ACTIONS.has(a.type) ? (
+                          <div className="text-xs text-text-secondary">(keine Parameter)</div>
                         ) : (
-                          <div className="text-sm text-text">(keine Parameter)</div>
+                          <input
+                            type="text"
+                            value={a.value}
+                            onChange={(e) => updateActionValue(idx, e.target.value)}
+                            disabled={!a.enabled}
+                            className="w-full px-2 py-1.5 border border-border rounded text-sm bg-white"
+                          />
                         )}
                         {a.description && (
                           <div className="text-xs text-text-secondary">{a.description}</div>
@@ -433,10 +491,14 @@ function buildRuleCriteria(items: SuggestedCriterion[]): RuleCriteria {
   return criteria;
 }
 
-function buildRuleActions(items: SuggestedAction[]): RuleAction[] {
+function buildRuleActions(
+  items: SuggestedAction[],
+  actionIntegrationIds: Record<number, string>,
+  integrations: Integration[],
+): RuleAction[] {
   const out: RuleAction[] = [];
-  for (const a of items) {
-    if (!a.enabled) continue;
+  items.forEach((a, idx) => {
+    if (!a.enabled) return;
     switch (a.type) {
       case 'categorize':
         out.push({ type: 'categorize', targetCategory: a.value });
@@ -447,10 +509,39 @@ function buildRuleActions(items: SuggestedAction[]): RuleAction[] {
       case 'markRead':
         out.push({ type: 'markRead' });
         break;
+      case 'markUnread':
+        out.push({ type: 'markUnread' });
+        break;
       case 'flag':
         out.push({ type: 'flag' });
         break;
+      case 'unflag':
+        out.push({ type: 'unflag' });
+        break;
+      case 'delete':
+        out.push({ type: 'delete' });
+        break;
+      case 'extractActions':
+        out.push({ type: 'extractActions' });
+        break;
+      case 'forwardToDms': {
+        // Prefer the explicit user pick, else the suggested integrationType
+        // match, else the first active integration — skip entirely if nothing
+        // is configured.
+        const chosenId =
+          actionIntegrationIds[idx]
+          ?? integrations.find(i => i.type === a.integrationType)?.id
+          ?? integrations[0]?.id;
+        if (!chosenId) return;
+        const integration = integrations.find(i => i.id === chosenId);
+        out.push({
+          type: 'forwardToDms',
+          integrationId: chosenId,
+          integrationName: integration?.name,
+        });
+        break;
+      }
     }
-  }
+  });
   return out;
 }
