@@ -56,6 +56,13 @@ export async function forwardToIntegration(
       case 'paperless': {
         const baseUrl = (config.base_url || '').replace(/\/+$/, '');
 
+        // No PDF/binary attached → refuse. Previously we uploaded a synthetic
+        // .txt of metadata, which pollutes the DMS with unusable junk rows.
+        if (!data.attachment?.contentBytes) {
+          result.message = 'Paperless: PDF-Anhang fehlt in der E-Mail oder konnte nicht geladen werden.';
+          break;
+        }
+
         let title = data.email_subject || `Email ${data.email_id || 'unknown'}`;
         const metaParts: string[] = [];
         if (data.document_data) {
@@ -67,25 +74,10 @@ export async function forwardToIntegration(
 
         // Paperless requires multipart/form-data with a file
         const formData = new FormData();
-
-        if (data.attachment?.contentBytes) {
-          // Real file attachment (PDF from email)
-          const buffer = Buffer.from(data.attachment.contentBytes, 'base64');
-          const fileBlob = new Blob([buffer], { type: data.attachment.contentType || 'application/pdf' });
-          formData.append('document', fileBlob, data.attachment.name || 'document.pdf');
-          logger.info('Paperless (forwardService): uploading real attachment', { name: data.attachment.name, size: buffer.length });
-        } else {
-          // Fallback: text document with metadata
-          const docContent = [
-            `Dokument: ${title}`,
-            `E-Mail ID: ${data.email_id || 'unbekannt'}`,
-            `E-Mail Betreff: ${data.email_subject || 'unbekannt'}`,
-            '', ...metaParts, '',
-            `Importiert von MailSort am ${new Date().toLocaleString('de-DE')}`,
-          ].join('\n');
-          const fileBlob = new Blob([docContent], { type: 'text/plain' });
-          formData.append('document', fileBlob, `${title.replace(/[^a-zA-Z0-9äöüÄÖÜß\-_ ]/g, '_').substring(0, 100)}.txt`);
-        }
+        const buffer = Buffer.from(data.attachment.contentBytes, 'base64');
+        const fileBlob = new Blob([buffer], { type: data.attachment.contentType || 'application/pdf' });
+        formData.append('document', fileBlob, data.attachment.name || 'document.pdf');
+        logger.info('Paperless (forwardService): uploading real attachment', { name: data.attachment.name, size: buffer.length });
         formData.append('title', title);
 
         if (config.default_correspondent) formData.append('correspondent', config.default_correspondent);
@@ -522,17 +514,14 @@ export async function forwardToIntegration(
         let spFolderPath = (config.folder_path || '/Eingang').replace(/^\/+|\/+$/g, '');
         spFolderPath = `${spFolderPath}/${spNow.getFullYear()}/${String(spNow.getMonth() + 1).padStart(2, '0')}`;
 
-        // Upload file
-        let spFileName: string;
-        let spFileContent: Buffer;
-        if (data.attachment?.contentBytes) {
-          spFileContent = Buffer.from(data.attachment.contentBytes, 'base64');
-          spFileName = (data.attachment.name || 'document.pdf').replace(/[<>:"/\\|?*]/g, '_');
-        } else {
-          const spTitle = data.email_subject || 'dokument';
-          spFileContent = Buffer.from(`Dokument: ${spTitle}\nEmail: ${data.email_id || '-'}\n`, 'utf-8');
-          spFileName = `${spTitle.replace(/[^a-zA-Z0-9äöüÄÖÜß\-_ ]/g, '_').substring(0, 80)}.txt`;
+        // Upload file — require a real attachment. The old text-fallback
+        // created unusable .txt placeholders in the SharePoint library.
+        if (!data.attachment?.contentBytes) {
+          result.message = 'SharePoint: Kein PDF-Anhang vorhanden. Bitte E-Mail mit Anhang auswählen oder Anhang manuell hochladen.';
+          break;
         }
+        const spFileContent: Buffer = Buffer.from(data.attachment.contentBytes, 'base64');
+        const spFileName: string = (data.attachment.name || 'document.pdf').replace(/[<>:"/\\|?*]/g, '_');
 
         const spUploadUrl = `https://graph.microsoft.com/v1.0/drives/${spDrive.id}/root:/${spFolderPath}/${spFileName}:/content`;
         const spUploadResp = await fetch(spUploadUrl, {

@@ -597,11 +597,39 @@ export const getEmailAttachmentContent = async (messageId: string, attachmentId:
 // Get all PDF/document attachments for an email (with content)
 export const getDocumentAttachments = async (messageId: string): Promise<EmailAttachment[]> => {
   const attachments = await getEmailAttachments(messageId);
-  const docTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/tiff', 'application/vnd.openxmlformats-officedocument'];
 
-  const docAttachments = attachments.filter(a =>
-    !a.isInline && docTypes.some(t => a.contentType.startsWith(t))
-  );
+  // Match by content-type OR by filename extension. Many mail clients ship
+  // PDFs as application/octet-stream, so trusting contentType alone misses
+  // real documents. The extension allowlist keeps us off signatures / tiny
+  // logos (.png/.jpg are also matched by extension but signatures are
+  // flagged as isInline and already filtered).
+  const docContentTypes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/tiff',
+    'application/msword',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument',
+  ];
+  const docExtensions = /\.(pdf|jpg|jpeg|png|tif|tiff|doc|docx|xls|xlsx)$/i;
+
+  const docAttachments = attachments.filter(a => {
+    if (a.isInline) return false;
+    const name = a.name || '';
+    const ct = a.contentType || '';
+    return docContentTypes.some(t => ct.startsWith(t)) || docExtensions.test(name);
+  });
+
+  // Prefer PDFs first so callers that only use the [0]th attachment still
+  // get the primary document (not a signature image).
+  docAttachments.sort((a, b) => {
+    const aIsPdf = /\.pdf$/i.test(a.name) || a.contentType === 'application/pdf';
+    const bIsPdf = /\.pdf$/i.test(b.name) || b.contentType === 'application/pdf';
+    if (aIsPdf && !bIsPdf) return -1;
+    if (!aIsPdf && bIsPdf) return 1;
+    return 0;
+  });
 
   // Fetch content for each document attachment
   const withContent: EmailAttachment[] = [];
