@@ -786,6 +786,61 @@ router.delete('/:id', async (req, res, next) => {
   }
 });
 
+// GET /api/integrations/:id/forward-prefill?email_id=xxx
+// Returns the editable metadata schema for the integration (if any) plus the
+// latest extracted document_data for the email. Frontend uses this to render
+// a "confirm + enrich" modal before the actual forward, so the user can add
+// fields like Customer / Project that were never in the email itself.
+router.get('/:id/forward-prefill', async (req, res, next) => {
+  try {
+    const emailId = req.query.email_id as string | undefined;
+
+    const integration = await queryOne<any>(
+      'SELECT id, type, name, config FROM integrations WHERE id = $1 AND tenant_id = $2 AND enabled = true',
+      [req.params.id, req.tenantId]
+    );
+    if (!integration) {
+      return res.status(404).json({ error: 'Integration not found or disabled' });
+    }
+
+    const config = typeof integration.config === 'string'
+      ? JSON.parse(integration.config)
+      : integration.config;
+
+    // Editable schema per type:
+    //   sharepoint → config.metadata_columns is { document_data_field: sp_column_name }
+    //   paperless  → (future) config.custom_fields_map
+    //   others     → empty schema, caller will skip the modal
+    const metadataColumns: Record<string, string> = (config?.metadata_columns && typeof config.metadata_columns === 'object')
+      ? config.metadata_columns
+      : {};
+
+    // Latest extracted document_data for this email (Prior AI run).
+    let priorData: Record<string, unknown> = {};
+    if (emailId) {
+      const prior = await queryOne<{ document_data: unknown }>(
+        `SELECT document_data FROM actions
+         WHERE tenant_id = $1 AND email_id = $2 AND document_data IS NOT NULL
+         ORDER BY created_at DESC LIMIT 1`,
+        [req.tenantId, emailId]
+      );
+      if (prior?.document_data) {
+        priorData = typeof prior.document_data === 'string'
+          ? JSON.parse(prior.document_data)
+          : (prior.document_data as Record<string, unknown>);
+      }
+    }
+
+    res.json({
+      integrationType: integration.type,
+      metadata_columns: metadataColumns,
+      prefill: priorData,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/integrations/:id/forward - Forward document to integration
 router.post('/:id/forward', async (req, res, next) => {
   try {

@@ -34,6 +34,24 @@ export async function fetchActiveIntegrations(): Promise<Integration[]> {
   return (data.items ?? []).filter(i => i.enabled);
 }
 
+export interface ForwardPrefill {
+  integrationType: Integration['type'];
+  /** Map of document_data-field → target-system-column label. Empty when the
+   *  integration does not have a user-editable metadata schema. */
+  metadata_columns: Record<string, string>;
+  /** Latest extracted document_data for this email from any prior AI run. */
+  prefill: Record<string, unknown>;
+}
+
+export async function getForwardPrefill(
+  integrationId: string,
+  emailId: string
+): Promise<ForwardPrefill> {
+  return api.get<ForwardPrefill>(
+    `/integrations/${encodeURIComponent(integrationId)}/forward-prefill?email_id=${encodeURIComponent(emailId)}`
+  );
+}
+
 /**
  * Pull the primary document attachment (PDF preferred) from Graph. Returns
  * null when no suitable attachment is present — the caller can decide
@@ -98,7 +116,11 @@ export async function forwardEmailToIntegration(
   account: AccountInfo,
   email: Email,
   integrationId: string,
-  integrationType: Integration['type']
+  integrationType: Integration['type'],
+  /** Optional enriched document_data (auto-extracted + user-edited fields
+   *  from the MetadataPrefillModal). Overrides the server-side fallback
+   *  that would otherwise reuse the last action's data. */
+  documentData?: Record<string, unknown>
 ): Promise<ForwardOutcome> {
   const attachment = await fetchPrimaryAttachment(instance, account, email.id).catch(() => null);
 
@@ -118,6 +140,7 @@ export async function forwardEmailToIntegration(
       email_subject: email.subject,
       attachment: attachment ?? undefined,
       access_token: accessToken,
+      document_data: documentData,
     });
     return {
       success: result.success ?? true,

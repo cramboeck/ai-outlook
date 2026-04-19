@@ -26,6 +26,12 @@ import {
   forwardEmailToIntegration,
 } from '../../services/quickForwardService';
 import type { Integration, ForwardOutcome } from '../../services/quickForwardService';
+import { MetadataPrefillModal } from './MetadataPrefillModal';
+
+// Integrations that want a metadata preview/confirm step before the forward
+// is actually sent. Today: SharePoint (metadata_columns). Extend the set when
+// other integrations grow user-editable schemas.
+const INTEGRATIONS_WITH_PREFILL: Integration['type'][] = ['sharepoint'];
 
 interface Props {
   email: Email;
@@ -60,6 +66,7 @@ export const QuickForwardMenu = ({ email }: Props) => {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
+  const [pendingIntegration, setPendingIntegration] = useState<Integration | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -90,7 +97,12 @@ export const QuickForwardMenu = ({ email }: Props) => {
     setRowStates({});
   }, [email.id]);
 
-  const handleForward = async (integration: Integration) => {
+  // Actually dispatch the forward. `documentData` is optional — set when the
+  // user went through the metadata prefill modal.
+  const dispatchForward = async (
+    integration: Integration,
+    documentData?: Record<string, unknown>
+  ) => {
     if (!accounts[0]) {
       setRowStates(prev => ({ ...prev, [integration.id]: { status: 'error', message: 'Nicht angemeldet' } }));
       return;
@@ -101,7 +113,8 @@ export const QuickForwardMenu = ({ email }: Props) => {
       accounts[0],
       email,
       integration.id,
-      integration.type
+      integration.type,
+      documentData
     );
     setRowStates(prev => ({
       ...prev,
@@ -109,6 +122,15 @@ export const QuickForwardMenu = ({ email }: Props) => {
         ? { status: 'success', outcome }
         : { status: 'error', message: outcome.message },
     }));
+  };
+
+  // Entry point — may open the prefill modal first.
+  const handleForward = async (integration: Integration) => {
+    if (INTEGRATIONS_WITH_PREFILL.includes(integration.type)) {
+      setPendingIntegration(integration);
+      return;
+    }
+    await dispatchForward(integration);
   };
 
   return (
@@ -122,6 +144,21 @@ export const QuickForwardMenu = ({ email }: Props) => {
         Schnell senden
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
+
+      {pendingIntegration && (
+        <MetadataPrefillModal
+          integration={pendingIntegration}
+          emailId={email.id}
+          emailSubject={email.subject}
+          onClose={() => setPendingIntegration(null)}
+          onSubmit={(documentData) => {
+            const target = pendingIntegration;
+            setPendingIntegration(null);
+            setOpen(false);
+            void dispatchForward(target, documentData);
+          }}
+        />
+      )}
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
