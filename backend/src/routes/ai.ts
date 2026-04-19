@@ -4,10 +4,33 @@
 import { Router } from 'express';
 import { validate } from '../middleware/validate';
 import { classifySchema, classifyBatchSchema, extractActionsSchema, generateReplySchema, suggestFolderSchema } from '../schemas/ai.schema';
-import { getOpenAIClient, getModel, wrapSystemPrompt } from '../services/openaiClient';
+import { getOpenAIClient, getModel, getProvider, isAIConfigured, wrapSystemPrompt } from '../services/openaiClient';
+import { isOboConfigured } from '../services/authService';
 import { logger } from '../services/logger';
 
 const router = Router();
+
+// GET /api/ai-info — surface which AI provider + model the backend currently
+// uses, so the frontend can render a small badge and the user can verify
+// at a glance whether Ollama or Azure OpenAI is serving requests.
+router.get('/ai-info', (_req, res) => {
+  if (!isAIConfigured()) {
+    return res.json({
+      provider: 'unconfigured',
+      model: null,
+      configured: false,
+      copilotObo: isOboConfigured(),
+    });
+  }
+  // Trigger lazy client init so getProvider() is populated on first call.
+  try { getOpenAIClient(); } catch { /* isAIConfigured was true so this shouldn't throw */ }
+  res.json({
+    provider: getProvider(),  // 'azure' | 'ollama' | 'openai' | 'custom'
+    model: getModel(),
+    configured: true,
+    copilotObo: isOboConfigured(),
+  });
+});
 
 // Types
 interface CategoryDefinition {
