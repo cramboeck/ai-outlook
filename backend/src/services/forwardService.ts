@@ -509,10 +509,22 @@ export async function forwardToIntegration(
           break;
         }
 
-        // Build path
+        // Build path — `folder_strategy` controls how deep the structure
+        // should be. Default is flat (Microsoft's modern recommendation:
+        // use Views + Metadata columns, not folder hierarchies).
+        //   flat       → {folder_path}/                    ← default
+        //   by-year    → {folder_path}/{YYYY}/
+        //   year-month → {folder_path}/{YYYY}/{MM}/        ← legacy deep layout
         const spNow = new Date();
+        const year = String(spNow.getFullYear());
+        const month = String(spNow.getMonth() + 1).padStart(2, '0');
+        const strategy: 'flat' | 'by-year' | 'year-month'
+          = (config.folder_strategy === 'by-year' || config.folder_strategy === 'year-month')
+            ? config.folder_strategy
+            : 'flat';
         let spFolderPath = (config.folder_path || '/Eingang').replace(/^\/+|\/+$/g, '');
-        spFolderPath = `${spFolderPath}/${spNow.getFullYear()}/${String(spNow.getMonth() + 1).padStart(2, '0')}`;
+        if (strategy === 'by-year') spFolderPath = `${spFolderPath}/${year}`;
+        else if (strategy === 'year-month') spFolderPath = `${spFolderPath}/${year}/${month}`;
 
         // Upload file — require a real attachment. The old text-fallback
         // created unusable .txt placeholders in the SharePoint library.
@@ -521,7 +533,16 @@ export async function forwardToIntegration(
           break;
         }
         const spFileContent: Buffer = Buffer.from(data.attachment.contentBytes, 'base64');
-        const spFileName: string = (data.attachment.name || 'document.pdf').replace(/[<>:"/\\|?*]/g, '_');
+
+        // Build a deterministic, sortable filename from document metadata when
+        // available: 2026-04-19_ACME-GmbH_R-2026-0042.pdf
+        // Falls back to the original attachment name when nothing was
+        // extracted.
+        const spFileName: string = buildSharepointFilename(
+          data.attachment.name,
+          data.document_data,
+          spNow
+        );
 
         const spUploadUrl = `https://graph.microsoft.com/v1.0/drives/${spDrive.id}/root:/${spFolderPath}/${spFileName}:/content`;
         const spUploadResp = await fetch(spUploadUrl, {
@@ -653,6 +674,66 @@ interface ForwardCondition {
 interface ForwardRulesV2 {
   document_types?: string[];
   conditions?: ForwardCondition[];
+}
+
+/**
+ * Build a deterministic, sortable, SharePoint-safe file name from the
+ * extracted document data. Prefers the information we already know over
+ * whatever Outlook shipped in the attachment name.
+ *
+ * Format:   YYYY-MM-DD_<Vendor>_<InvoiceNumber>.<ext>
+ * Fallback: original attachment name, sanitised.
+ *
+ * Examples:
+ *   2026-04-19_ACME-GmbH_R-2026-0042.pdf
+ *   2026-04-19_dokument.pdf   (when no vendor / number available)
+ */
+function buildSharepointFilename(
+  originalName: string | undefined,
+  documentData: Record<string, any> | undefined,
+  now: Date
+): string {
+  const original = (originalName ?? 'document.pdf');
+  const extMatch = original.match(/\.[a-z0-9]{1,8}$/i);
+  const ext = (extMatch?.[0] ?? '.pdf').toLowerCase();
+
+  // SharePoint disallows <>:"/\|?* — trim + collapse whitespace too.
+  const sanitise = (s: string) => s
+    .replace(/[<>:"/\\|?*]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+
+  // Prefer the document's own date; fall back to today.
+  let datePart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const dd = documentData?.date;
+  if (typeof dd === 'string') {
+    const iso = dd.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) datePart = iso[1];
+  }
+
+  const vendorRaw = documentData?.vendor ? String(documentData.vendor) : '';
+  const numberRaw = documentData?.invoiceNumber
+    ? String(documentData.invoiceNumber)
+    : documentData?.orderNumber
+    ? String(documentData.orderNumber)
+    : '';
+
+  const vendor = sanitise(vendorRaw);
+  const number = sanitise(numberRaw);
+
+  const parts = [datePart];
+  if (vendor) parts.push(vendor);
+  if (number) parts.push(number);
+
+  if (parts.length === 1) {
+    // No meaningful metadata — fall back to a sanitised version of the
+    // original name, but prefix with the date for chronological sorting.
+    const originalStem = sanitise(original.replace(/\.[a-z0-9]{1,8}$/i, '')) || 'dokument';
+    return `${datePart}_${originalStem}${ext}`;
+  }
+  return parts.join('_') + ext;
 }
 
 function evaluateCondition(documentData: Record<string, any>, condition: ForwardCondition): boolean {

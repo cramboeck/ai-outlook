@@ -92,7 +92,8 @@ const CONFIG_FIELDS: Record<IntegrationType, { key: string; label: string; place
   sharepoint: [
     { key: 'site_url', label: 'Site-URL', placeholder: 'https://tenant.sharepoint.com/sites/...', required: true },
     { key: 'library_name', label: 'Bibliothek', placeholder: 'Dokumente', required: true },
-    { key: 'folder_path', label: 'Ordnerpfad', placeholder: '/Rechnungen/Eingang' },
+    { key: 'folder_path', label: 'Ordnerpfad (Basis)', placeholder: '/Rechnungen/Eingang' },
+    { key: 'folder_strategy', label: 'Ordnerstruktur', placeholder: 'flat' },
   ],
   sevdesk: [
     { key: 'api_token', label: 'API-Token', placeholder: 'Ihr sevDesk API-Token', type: 'password', required: true },
@@ -866,6 +867,21 @@ export function Integrations() {
                           <option value="teams">Microsoft Teams (Adaptive Card)</option>
                           <option value="json">Standard JSON</option>
                         </select>
+                      ) : field.key === 'folder_strategy' ? (
+                        <>
+                          <select
+                            value={(form.config[field.key] as string) || 'flat'}
+                            onChange={e => updateConfig(field.key, e.target.value)}
+                            className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-colors"
+                          >
+                            <option value="flat">Flach (empfohlen — nutze Metadaten-Spalten)</option>
+                            <option value="by-year">Nach Jahr gruppieren</option>
+                            <option value="year-month">Nach Jahr und Monat (alte Struktur)</option>
+                          </select>
+                          <p className="text-xs text-text-secondary/70 mt-1">
+                            Microsoft empfiehlt flache Strukturen + SharePoint-Views (filtern/gruppieren in SharePoint). Tiefe Ordner-Hierarchien erschweren die Suche.
+                          </p>
+                        </>
                       ) : field.key === 'headers' ? (
                         <textarea
                           value={form.config[field.key] || ''}
