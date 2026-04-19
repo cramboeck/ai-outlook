@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2, RefreshCw, Filter } from 'lucide-react';
 import { EmailCard } from './EmailCard';
 import type { Email } from '../../types';
+import { getEmailStatusBatch } from '../../services/emailStatusService';
+import type { EmailStatus } from '../../services/emailStatusService';
 
 interface EmailListProps {
   emails: Email[];
@@ -13,7 +15,7 @@ interface EmailListProps {
   selectedEmailId?: string;
 }
 
-type FilterType = 'all' | 'uncategorized' | 'categorized';
+type FilterType = 'all' | 'uncategorized' | 'categorized' | 'action' | 'forwarded';
 
 export const EmailList = ({
   emails,
@@ -25,14 +27,38 @@ export const EmailList = ({
   selectedEmailId,
 }: EmailListProps) => {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [statuses, setStatuses] = useState<Record<string, EmailStatus>>({});
+
+  // Batch-fetch workflow status for all currently-displayed emails. Runs
+  // whenever the id list changes so switching folders or refetching inbox
+  // refreshes indicators without extra trips when the list is unchanged.
+  const emailIdsKey = useMemo(
+    () => emails.map(e => e.id).join('|'),
+    [emails]
+  );
+  useEffect(() => {
+    if (emails.length === 0) {
+      setStatuses({});
+      return;
+    }
+    let cancelled = false;
+    getEmailStatusBatch(emails.map(e => e.id))
+      .then(data => { if (!cancelled) setStatuses(data); })
+      .catch(() => { /* silent; badges simply stay empty */ });
+    return () => { cancelled = true; };
+  }, [emailIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredEmails = emails.filter((email) => {
     if (filter === 'uncategorized') return email.categories.length === 0;
     if (filter === 'categorized') return email.categories.length > 0;
+    if (filter === 'action') return statuses[email.id]?.hasAction === true;
+    if (filter === 'forwarded') return statuses[email.id]?.forwarded === true;
     return true;
   });
 
   const uncategorizedCount = emails.filter((e) => e.categories.length === 0).length;
+  const actionCount = emails.filter(e => statuses[e.id]?.hasAction === true).length;
+  const forwardedCount = emails.filter(e => statuses[e.id]?.forwarded === true).length;
 
   return (
     <div className="space-y-4">
@@ -48,6 +74,8 @@ export const EmailList = ({
             <option value="all">Alle E-Mails ({emails.length})</option>
             <option value="uncategorized">Unkategorisiert ({uncategorizedCount})</option>
             <option value="categorized">Kategorisiert ({emails.length - uncategorizedCount})</option>
+            <option value="action">Mit offener Aufgabe ({actionCount})</option>
+            <option value="forwarded">Weitergeleitet ({forwardedCount})</option>
           </select>
         </div>
 
@@ -80,6 +108,7 @@ export const EmailList = ({
               onSelect={onEmailSelect}
               onClassify={onClassify}
               onReply={onReply}
+              status={statuses[email.id]}
             />
           ))}
         </div>

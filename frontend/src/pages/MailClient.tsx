@@ -13,6 +13,9 @@ import { BatchClassifyModal } from '../components/classification/BatchClassifyMo
 import { ReplyModal } from '../components/email/ReplyModal';
 import { SearchModal } from '../components/mail/SearchModal';
 import { SmartRuleFromEmailModal } from '../components/SmartRuleFromEmailModal';
+import { ShortcutHelpOverlay } from '../components/ShortcutHelpOverlay';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import type { Shortcut } from '../hooks/useKeyboardShortcuts';
 import { useClassify } from '../hooks/useClassify';
 import {
   getEmailsFromFolder,
@@ -49,6 +52,9 @@ export const MailClient = () => {
   // Smart-Rule-from-Email modal
   const [ruleSuggestEmail, setRuleSuggestEmail] = useState<Email | null>(null);
   const [ruleCreatedMsg, setRuleCreatedMsg] = useState<string | null>(null);
+
+  // Shortcut help overlay
+  const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
 
   const account = accounts[0];
   const userName = account?.name || 'Freundliche Grüße';
@@ -195,6 +201,32 @@ export const MailClient = () => {
     selectedFolderName.toLowerCase().includes('sent');
 
   const isFollowUp = selectedFolderId === 'followup';
+
+  // List navigation helpers used by keyboard shortcuts
+  const selectByOffset = (offset: number) => {
+    if (emails.length === 0) return;
+    const currentIdx = selectedEmail
+      ? emails.findIndex((e) => e.id === selectedEmail.id)
+      : -1;
+    const nextIdx = currentIdx < 0
+      ? (offset > 0 ? 0 : emails.length - 1)
+      : Math.min(emails.length - 1, Math.max(0, currentIdx + offset));
+    setSelectedEmail(emails[nextIdx]);
+  };
+
+  const shortcuts: Shortcut[] = [
+    { group: 'Navigation', keys: ['ArrowDown', 'j'], description: 'Nächste E-Mail', action: () => selectByOffset(1) },
+    { group: 'Navigation', keys: ['ArrowUp', 'k'], description: 'Vorige E-Mail', action: () => selectByOffset(-1) },
+    { group: 'Navigation', keys: 'Escape', description: 'Auswahl schließen', allowInInput: false, action: () => setSelectedEmail(null) },
+    { group: 'Aktionen', keys: 'c', description: 'Klassifizieren', action: () => selectedEmail && handleClassifyEmail(selectedEmail) },
+    { group: 'Aktionen', keys: 'r', description: 'Antworten (KI)', action: () => selectedEmail && handleReplyClick(selectedEmail) },
+    { group: 'Aktionen', keys: 'a', description: 'Vollständige KI-Analyse', action: () => selectedEmail && handleAnalyzeEmail(selectedEmail) },
+    { group: 'Ansicht', keys: '/', description: 'Suche öffnen', action: () => setIsSearchModalOpen(true) },
+    { group: 'Ansicht', keys: 'n', description: 'Neue E-Mail', action: () => setIsComposeOpen(true) },
+    { group: 'Hilfe', keys: '?', shift: true, allowInInput: false, description: 'Shortcut-Hilfe', action: () => setIsShortcutHelpOpen(v => !v) },
+  ];
+
+  useKeyboardShortcuts(shortcuts, !ruleSuggestEmail && !isReplyModalOpen && !isBatchModalOpen && !isComposeOpen);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] -m-6">
@@ -482,6 +514,22 @@ export const MailClient = () => {
           {ruleCreatedMsg}
         </div>
       )}
+
+      {/* Keyboard Shortcut Help Overlay (? to open) */}
+      <ShortcutHelpOverlay
+        isOpen={isShortcutHelpOpen}
+        shortcuts={shortcuts}
+        onClose={() => setIsShortcutHelpOpen(false)}
+      />
+
+      {/* Subtle hint badge in corner so users discover ?  */}
+      <button
+        onClick={() => setIsShortcutHelpOpen(true)}
+        className="fixed bottom-4 right-4 z-40 text-[11px] text-text-secondary bg-white/80 backdrop-blur border border-border rounded-md px-2 py-1 hover:bg-white hover:text-text transition-colors shadow-sm"
+        title="Tastatur-Shortcuts anzeigen"
+      >
+        Shortcuts <kbd className="font-mono ml-1 px-1 rounded bg-gray-100 border border-gray-300">?</kbd>
+      </button>
     </div>
   );
 };

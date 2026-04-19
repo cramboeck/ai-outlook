@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sanitizeHtml } from '../../utils/sanitize';
 import { QuickForwardMenu } from '../email/QuickForwardMenu';
+import { EmailTimeline } from '../email/EmailTimeline';
 import {
   X,
   Reply,
@@ -290,6 +291,11 @@ export const EmailDetail = ({
             ) : (
               <p className="text-text-secondary">{email.bodyPreview}</p>
             )}
+          </div>
+
+          {/* Activity Timeline */}
+          <div className="px-6 pb-6">
+            <EmailTimeline emailId={email.id} />
           </div>
         </div>
       )}
