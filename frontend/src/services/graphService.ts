@@ -674,11 +674,15 @@ export interface TodoTask {
 }
 
 // Get all To-Do lists
+//
+// Note: `wellknownListName` is documented in Graph v1.0 but some tenants reject
+// it inside $select with a 400 (likely a tenant-feature-flag thing on
+// Microsoft's side). We omit $select entirely so the API returns the full
+// list shape including wellknownListName when available — payloads are tiny.
 export const getTodoLists = async (): Promise<TodoTaskList[]> => {
   const client = getGraphClient();
   const response = await client
     .api('/me/todo/lists')
-    .select('id,displayName,isOwner,isShared,wellknownListName')
     .get();
   return response.value || [];
 };
