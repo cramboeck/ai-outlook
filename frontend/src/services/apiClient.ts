@@ -100,7 +100,7 @@ export const apiClient = async <T = unknown>(
     let errorMessage: string;
     try {
       const errorData = await response.json();
-      errorMessage = errorData.details || errorData.error || errorData.message || `API error: ${response.status}`;
+      errorMessage = formatApiError(errorData, response.status);
     } catch {
       errorMessage = `API error: ${response.status} ${response.statusText}`;
     }
@@ -114,6 +114,40 @@ export const apiClient = async <T = unknown>(
 
   return response.json();
 };
+
+// Turn any error payload into a single readable string. Supports:
+//   - Zod validation: { error: 'Validation failed', details: [{field,message}] }
+//   - Copilot-unavailable: { error, reason }
+//   - Generic: { error: string } or { message: string }
+function formatApiError(payload: unknown, status: number): string {
+  if (!payload || typeof payload !== 'object') {
+    return `API error: ${status}`;
+  }
+  const p = payload as Record<string, unknown>;
+
+  // Zod details array → "field: message" joined
+  if (Array.isArray(p.details)) {
+    const parts = p.details
+      .map(d => {
+        if (typeof d === 'string') return d;
+        if (d && typeof d === 'object') {
+          const obj = d as { field?: string; message?: string };
+          return obj.field ? `${obj.field}: ${obj.message ?? '?'}` : obj.message ?? JSON.stringify(d);
+        }
+        return String(d);
+      })
+      .filter(Boolean);
+    if (parts.length > 0) return parts.join(', ');
+  }
+
+  // Normal string fields
+  for (const key of ['error', 'message', 'details'] as const) {
+    const v = p[key];
+    if (typeof v === 'string' && v.length > 0) return v;
+  }
+
+  return `API error: ${status}`;
+}
 
 // Convenience methods
 export const api = {
