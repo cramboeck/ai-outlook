@@ -786,6 +786,192 @@ router.delete('/:id', async (req, res, next) => {
   }
 });
 
+// POST /api/integrations/:id/sharepoint-setup
+// One-click assistant: creates the 12 metadata columns MailSort expects in
+// the target SharePoint library via Graph API. Skips columns that already
+// exist. Requires a delegated Graph token (access_token in body) with
+// Sites.Manage.All. Saves the user from manually clicking "+ Add column"
+// twelve times in SharePoint.
+router.post('/:id/sharepoint-setup', async (req, res, next) => {
+  try {
+    const { access_token } = req.body as { access_token?: string };
+    if (!access_token) {
+      return res.status(400).json({ error: 'access_token required (Graph Sites.Manage.All scope)' });
+    }
+
+    const integration = await queryOne<any>(
+      'SELECT * FROM integrations WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, req.tenantId]
+    );
+    if (!integration || integration.type !== 'sharepoint') {
+      return res.status(404).json({ error: 'SharePoint integration not found' });
+    }
+
+    const config = typeof integration.config === 'string'
+      ? JSON.parse(integration.config)
+      : integration.config;
+
+    const siteUrl = config.site_url as string | undefined;
+    const libraryName = (config.library_name as string | undefined) || 'Documents';
+    if (!siteUrl) {
+      return res.status(400).json({ error: 'site_url missing in integration config' });
+    }
+
+    // 1. Resolve site
+    const parsed = new URL(siteUrl);
+    const siteResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${parsed.hostname}:${parsed.pathname.replace(/\/$/, '')}`,
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+    if (!siteResp.ok) {
+      return res.status(502).json({ error: `Site nicht gefunden: HTTP ${siteResp.status}` });
+    }
+    const site = await siteResp.json();
+
+    // 2. Resolve list (= the library's backing SharePoint list)
+    const listsResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${site.id}/lists?$select=id,name,displayName`,
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+    if (!listsResp.ok) {
+      return res.status(502).json({ error: `Listen nicht abrufbar: HTTP ${listsResp.status}` });
+    }
+    const listsJson = await listsResp.json();
+    const targetList = (listsJson.value ?? []).find((l: any) =>
+      l.displayName === libraryName || l.name === libraryName
+      || l.displayName === 'Dokumente' || l.displayName === 'Documents'
+      || l.displayName === 'Freigegebene Dokumente' || l.name === 'Shared Documents'
+    );
+    if (!targetList) {
+      return res.status(404).json({
+        error: `Bibliothek "${libraryName}" nicht gefunden. Verfügbar: ${(listsJson.value ?? []).map((l: any) => l.displayName).join(', ')}`,
+      });
+    }
+
+    // 3. Get existing column display names so we don't re-create
+    const colsResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${targetList.id}/columns?$select=displayName,name`,
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+    const existingCols: Array<{ displayName: string; name: string }> =
+      colsResp.ok ? (await colsResp.json()).value ?? [] : [];
+    const existingNames = new Set(
+      existingCols.flatMap(c => [c.displayName?.toLowerCase(), c.name?.toLowerCase()]).filter(Boolean)
+    );
+
+    // 4. Column blueprint. displayName carries German chars for users,
+    //    name is alphanumeric for Graph internals (no spaces / umlauts).
+    const COLUMNS: Array<{ displayName: string; name: string }> = [
+      { displayName: 'Lieferant',       name: 'Lieferant' },
+      { displayName: 'Betrag',          name: 'Betrag' },
+      { displayName: 'Rechnungsnummer', name: 'Rechnungsnummer' },
+      { displayName: 'Bestellnummer',   name: 'Bestellnummer' },
+      { displayName: 'Datum',           name: 'Datum' },
+      { displayName: 'Fälligkeitsdatum', name: 'Faelligkeitsdatum' },
+      { displayName: 'Währung',         name: 'Waehrung' },
+      { displayName: 'IBAN',            name: 'IBAN' },
+      { displayName: 'Dokumenttyp',     name: 'Dokumenttyp' },
+      { displayName: 'Kunde',           name: 'Kunde' },
+      { displayName: 'Projekt',         name: 'Projekt' },
+      { displayName: 'Kostenstelle',    name: 'Kostenstelle' },
+    ];
+
+    const created: string[] = [];
+    const skipped: string[] = [];
+    const errors: Array<{ column: string; error: string }> = [];
+
+    // 5. Create missing columns one at a time — a 429 on one column
+    //    shouldn't kill the batch.
+    for (const col of COLUMNS) {
+      if (existingNames.has(col.displayName.toLowerCase()) || existingNames.has(col.name.toLowerCase())) {
+        skipped.push(col.displayName);
+        continue;
+      }
+      try {
+        const createResp = await fetch(
+          `https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${targetList.id}/columns`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: col.name,
+              displayName: col.displayName,
+              text: {
+                allowMultipleLines: false,
+                appendChangesToExistingText: false,
+                linesForEditing: 1,
+                maxLength: 255,
+              },
+            }),
+          }
+        );
+        if (createResp.ok) {
+          created.push(col.displayName);
+        } else {
+          const text = await createResp.text().catch(() => '');
+          errors.push({
+            column: col.displayName,
+            error: `HTTP ${createResp.status}: ${text.slice(0, 200)}`,
+          });
+        }
+      } catch (err) {
+        errors.push({
+          column: col.displayName,
+          error: (err as Error).message,
+        });
+      }
+    }
+
+    // 6. Auto-populate the integration's metadata_columns mapping so
+    //    Quick-Forward immediately picks up every created column. We only
+    //    add missing keys — we don't overwrite manual tweaks.
+    const DEFAULT_MAPPING: Record<string, string> = {
+      vendor: 'Lieferant',
+      amount: 'Betrag',
+      invoiceNumber: 'Rechnungsnummer',
+      orderNumber: 'Bestellnummer',
+      date: 'Datum',
+      dueDate: 'Fälligkeitsdatum',
+      currency: 'Währung',
+      iban: 'IBAN',
+      documentType: 'Dokumenttyp',
+      customer: 'Kunde',
+      project: 'Projekt',
+      costCenter: 'Kostenstelle',
+    };
+    const currentMapping = (config.metadata_columns || {}) as Record<string, string>;
+    const mergedMapping = { ...DEFAULT_MAPPING, ...currentMapping };
+    config.metadata_columns = mergedMapping;
+    await query(
+      'UPDATE integrations SET config = $1::jsonb WHERE id = $2 AND tenant_id = $3',
+      [JSON.stringify(config), req.params.id, req.tenantId]
+    );
+
+    logger.info('SharePoint setup completed', {
+      integrationId: req.params.id,
+      created: created.length,
+      skipped: skipped.length,
+      errors: errors.length,
+    });
+
+    res.json({
+      siteId: site.id,
+      listId: targetList.id,
+      libraryName: targetList.displayName,
+      created,
+      skipped,
+      errors,
+      metadata_columns: mergedMapping,
+    });
+  } catch (error) {
+    logger.error('SharePoint setup error', { error: (error as Error).message });
+    next(error);
+  }
+});
+
 // GET /api/integrations/:id/forward-prefill?email_id=xxx
 // Returns the editable metadata schema for the integration (if any) plus the
 // latest extracted document_data for the email. Frontend uses this to render

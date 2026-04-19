@@ -226,6 +226,12 @@ export function Integrations() {
   // Test connection
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; message: string } | null>(null);
+  const [setupRunning, setSetupRunning] = useState(false);
+  const [setupResult, setSetupResult] = useState<{
+    created: string[];
+    skipped: string[];
+    errors: Array<{ column: string; error: string }>;
+  } | null>(null);
 
   // Debug panel
   const [debugData, setDebugData] = useState<any>(null);
@@ -450,6 +456,60 @@ export function Integrations() {
     setTestingId(null);
     // Auto-clear after 8 seconds
     setTimeout(() => setTestResult(r => (r?.id === integration.id ? null : r)), 8000);
+  }
+
+  // One-click setup: acquires a Graph token with Sites.Manage scope and asks
+  // the backend to create every MailSort metadata column in the integration's
+  // SharePoint library. Columns that already exist are skipped.
+  async function handleSharepointSetup() {
+    if (!editingId) return;
+    setSetupRunning(true);
+    setSetupResult(null);
+    try {
+      const account = accounts[0];
+      if (!account) {
+        setSetupResult({ created: [], skipped: [], errors: [{ column: '-', error: 'Nicht angemeldet' }] });
+        return;
+      }
+
+      // Try silent first with elevated scope; fall back to popup if consent needed.
+      let accessToken: string | undefined;
+      const manageScopes = { scopes: [...sharepointScopes.scopes, 'https://graph.microsoft.com/Sites.Manage.All'] };
+      try {
+        const tokenResp = await instance.acquireTokenSilent({ ...manageScopes, account });
+        accessToken = tokenResp.accessToken;
+      } catch {
+        try {
+          const tokenResp = await instance.acquireTokenPopup(manageScopes);
+          accessToken = tokenResp.accessToken;
+        } catch {
+          setSetupResult({ created: [], skipped: [], errors: [{ column: '-', error: 'Sites.Manage.All konnte nicht bewilligt werden. Admin-Consent erforderlich.' }] });
+          return;
+        }
+      }
+
+      const result = await api.post<{
+        created: string[];
+        skipped: string[];
+        errors: Array<{ column: string; error: string }>;
+        metadata_columns: Record<string, string>;
+      }>(`/integrations/${editingId}/sharepoint-setup`, { access_token: accessToken });
+
+      setSetupResult({ created: result.created, skipped: result.skipped, errors: result.errors });
+
+      // Refresh the form config so the user sees the auto-populated mapping.
+      if (result.metadata_columns) {
+        updateConfig('metadata_columns', result.metadata_columns as any);
+      }
+    } catch (err) {
+      setSetupResult({
+        created: [],
+        skipped: [],
+        errors: [{ column: '-', error: err instanceof Error ? err.message : 'Setup fehlgeschlagen' }],
+      });
+    } finally {
+      setSetupRunning(false);
+    }
   }
 
   async function handleDebug(integration: Integration) {
@@ -922,6 +982,49 @@ export function Integrations() {
                   <p className="text-xs text-text-secondary/70 mb-3">
                     Ordne MailSort-Felder den SharePoint-Spalten zu. Die Spalten müssen in der SharePoint-Bibliothek existieren.
                   </p>
+
+                  {/* One-click setup assistant */}
+                  {editingId && (
+                    <div className="mb-3 p-3 rounded-lg border border-dashed border-primary/40 bg-primary/5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-text">Setup-Assistent</p>
+                          <p className="text-xs text-text-secondary">
+                            Legt die 12 Standardspalten (Lieferant, Betrag, Kunde, Projekt …) automatisch in der konfigurierten SharePoint-Bibliothek an.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSharepointSetup}
+                          disabled={setupRunning}
+                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm disabled:opacity-50"
+                        >
+                          {setupRunning ? 'Lege an…' : 'Spalten anlegen'}
+                        </button>
+                      </div>
+
+                      {setupResult && (
+                        <div className="mt-3 space-y-1.5 text-xs">
+                          {setupResult.created.length > 0 && (
+                            <div className="text-emerald-700 dark:text-emerald-400">
+                              ✓ Angelegt: {setupResult.created.join(', ')}
+                            </div>
+                          )}
+                          {setupResult.skipped.length > 0 && (
+                            <div className="text-text-secondary">
+                              ⤷ Bereits vorhanden: {setupResult.skipped.join(', ')}
+                            </div>
+                          )}
+                          {setupResult.errors.length > 0 && (
+                            <div className="text-red-600 dark:text-red-400">
+                              ✗ Fehler: {setupResult.errors.map(e => `${e.column}: ${e.error}`).join(' · ')}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     {Object.entries((form.config.metadata_columns as Record<string, string>) || {}).map(([dataField, spColumn], idx) => (
                       <div key={idx} className="flex items-center gap-2">
