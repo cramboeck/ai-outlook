@@ -10,6 +10,8 @@
     "start:azure": "func start",
     "db:migrate": "npx tsx src/db/migrate.ts",
     "db:seed": "npx tsx src/db/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rimraf dist"
   },
   "dependencies": {
@@ -35,9 +37,12 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.10.9",
+    "@types/supertest": "^7.2.0",
     "@types/uuid": "^9.0.7",
     "rimraf": "^6.0.1",
+    "supertest": "^7.2.2",
     "tsx": "^4.7.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.4"
   }
 }
