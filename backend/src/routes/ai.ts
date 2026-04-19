@@ -471,7 +471,9 @@ ${folderList}
 // shows the result in a modal so the user can pick what to keep.
 const suggestRuleSchema = z.object({
   subject: z.string().max(2000).optional().default(''),
-  body: z.string().max(20_000).optional().default(''),
+  // The frontend strips HTML + truncates before sending, but allow generous
+  // headroom for edge cases (large newsletters, raw bodies from tests).
+  body: z.string().max(100_000).optional().default(''),
   sender: z.string().max(500).optional().default(''),
   hasAttachments: z.boolean().optional().default(false),
   importance: z.enum(['high', 'normal', 'low']).optional(),

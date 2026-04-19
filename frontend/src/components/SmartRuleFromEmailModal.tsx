@@ -74,9 +74,21 @@ export const SmartRuleFromEmailModal = ({
     setLoading(true);
     setError(null);
     setSuggestion(null);
+    // Strip HTML + collapse whitespace + clamp to 5 000 chars. The backend
+    // prompt only uses the first ~1 500 anyway; sending the raw HTML of a
+    // newsletter would blow past the server-side input limit.
+    const plainBody = (email.body?.content || email.bodyPreview || '')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 5000);
+
     suggestRuleFromEmail({
       subject: email.subject,
-      body: email.body?.content || email.bodyPreview || '',
+      body: plainBody,
       sender: email.from.emailAddress.address,
       hasAttachments: !!email.hasAttachments,
       importance: (email.importance as 'high' | 'normal' | 'low') || 'normal',
