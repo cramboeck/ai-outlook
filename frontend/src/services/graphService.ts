@@ -754,6 +754,30 @@ export const updateTodoChecklistItem = async (
     .patch({ isChecked });
 };
 
+// Create a new checklist item under a To-Do task.
+export const createTodoChecklistItem = async (
+  listId: string,
+  taskId: string,
+  displayName: string
+): Promise<TodoChecklistItem> => {
+  const client = getGraphClient();
+  return await client
+    .api(`/me/todo/lists/${listId}/tasks/${taskId}/checklistItems`)
+    .post({ displayName, isChecked: false });
+};
+
+// Remove a checklist item from a To-Do task.
+export const deleteTodoChecklistItem = async (
+  listId: string,
+  taskId: string,
+  checklistItemId: string
+): Promise<void> => {
+  const client = getGraphClient();
+  await client
+    .api(`/me/todo/lists/${listId}/tasks/${taskId}/checklistItems/${checklistItemId}`)
+    .delete();
+};
+
 // Create a task in a To-Do list
 export const createTodoTask = async (
   listId: string,

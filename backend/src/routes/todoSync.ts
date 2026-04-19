@@ -275,6 +275,72 @@ router.post('/push-confirm', async (req, res, next) => {
   }
 });
 
+// POST /api/todo/action/:actionId/subtask
+// Adds a new subtask locally after the UI already created it in Graph.
+// Body: { id, displayName, isChecked }
+router.post('/action/:actionId/subtask', async (req, res, next) => {
+  try {
+    const { id, displayName, isChecked } = req.body as {
+      id?: string; displayName?: string; isChecked?: boolean;
+    };
+    if (!id || typeof displayName !== 'string') {
+      return res.status(400).json({ error: 'id and displayName are required' });
+    }
+
+    const row = await queryOne<{ subtasks: unknown }>(
+      'SELECT subtasks FROM actions WHERE id = $1 AND tenant_id = $2',
+      [req.params.actionId, req.tenantId]
+    );
+    if (!row) {
+      return res.status(404).json({ error: 'Action not found' });
+    }
+
+    const current: Array<{ id: string; displayName: string; isChecked: boolean }> =
+      typeof row.subtasks === 'string' ? JSON.parse(row.subtasks) :
+        Array.isArray(row.subtasks) ? row.subtasks as any[] : [];
+
+    if (current.some(s => s.id === id)) {
+      return res.json({ subtasks: current });
+    }
+
+    current.push({ id, displayName, isChecked: !!isChecked });
+    await query(
+      'UPDATE actions SET subtasks = $1::jsonb WHERE id = $2 AND tenant_id = $3',
+      [JSON.stringify(current), req.params.actionId, req.tenantId]
+    );
+    res.json({ subtasks: current });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/todo/action/:actionId/subtask/:subtaskId
+// Removes a subtask from our DB mirror after the UI deleted it in Graph.
+router.delete('/action/:actionId/subtask/:subtaskId', async (req, res, next) => {
+  try {
+    const row = await queryOne<{ subtasks: unknown }>(
+      'SELECT subtasks FROM actions WHERE id = $1 AND tenant_id = $2',
+      [req.params.actionId, req.tenantId]
+    );
+    if (!row) {
+      return res.status(404).json({ error: 'Action not found' });
+    }
+
+    const current: Array<{ id: string; displayName: string; isChecked: boolean }> =
+      typeof row.subtasks === 'string' ? JSON.parse(row.subtasks) :
+        Array.isArray(row.subtasks) ? row.subtasks as any[] : [];
+
+    const filtered = current.filter(s => s.id !== req.params.subtaskId);
+    await query(
+      'UPDATE actions SET subtasks = $1::jsonb WHERE id = $2 AND tenant_id = $3',
+      [JSON.stringify(filtered), req.params.actionId, req.tenantId]
+    );
+    res.json({ subtasks: filtered });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PATCH /api/todo/action/:actionId/subtask/:subtaskId
 // Flips one stored subtask's isChecked flag. Called by the UI after the
 // Graph PATCH on the corresponding checklistItem succeeds, so the DB-side

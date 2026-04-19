@@ -594,21 +594,102 @@ export function Actions() {
     }
   };
 
+  // Per-action new-subtask input (controlled text field + pending flag).
+  const [newSubtaskText, setNewSubtaskText] = useState<Record<string, string>>({});
+  const addingSubtask = useRef(new Set<string>());
+
+  const addSubtask = async (action: Action) => {
+    const title = (newSubtaskText[action.id] ?? '').trim();
+    if (!title) return;
+    if (!action.ms_todo_id || !action.ms_todo_list_id) {
+      // Local-only todos aren't supported yet — subtasks need a Graph anchor.
+      return;
+    }
+    if (addingSubtask.current.has(action.id)) return;
+    addingSubtask.current.add(action.id);
+    forceRender(x => x + 1);
+
+    try {
+      const account = accounts[0];
+      if (!account) throw new Error('Nicht angemeldet');
+      const tokenResp = await instance.acquireTokenSilent({ ...todoScopes, account });
+      initGraphClient(tokenResp.accessToken);
+
+      const { createTodoChecklistItem } = await import('../services/graphService');
+      const created = await createTodoChecklistItem(action.ms_todo_list_id, action.ms_todo_id, title);
+
+      // Persist to our DB mirror so the next page load stays consistent.
+      await api.post(`/todo/action/${action.id}/subtask`, {
+        id: created.id,
+        displayName: created.displayName,
+        isChecked: created.isChecked,
+      });
+
+      setActions(prev => prev.map(a => {
+        if (a.id !== action.id) return a;
+        const subs = parseSubtasks(a.subtasks);
+        return { ...a, subtasks: [...subs, { id: created.id, displayName: created.displayName, isChecked: created.isChecked }] };
+      }));
+      setNewSubtaskText(prev => ({ ...prev, [action.id]: '' }));
+    } catch (err) {
+      console.error('Unteraufgabe hinzufügen fehlgeschlagen:', err);
+    } finally {
+      addingSubtask.current.delete(action.id);
+      forceRender(x => x + 1);
+    }
+  };
+
+  const deleteSubtask = async (action: Action, sub: Subtask) => {
+    if (!action.ms_todo_id || !action.ms_todo_list_id) return;
+    const confirmed = confirm(`Unteraufgabe "${sub.displayName}" löschen?`);
+    if (!confirmed) return;
+
+    // Optimistic removal
+    setActions(prev => prev.map(a => {
+      if (a.id !== action.id) return a;
+      return { ...a, subtasks: parseSubtasks(a.subtasks).filter(s => s.id !== sub.id) };
+    }));
+
+    try {
+      const account = accounts[0];
+      if (!account) throw new Error('Nicht angemeldet');
+      const tokenResp = await instance.acquireTokenSilent({ ...todoScopes, account });
+      initGraphClient(tokenResp.accessToken);
+
+      const { deleteTodoChecklistItem } = await import('../services/graphService');
+      await deleteTodoChecklistItem(action.ms_todo_list_id, action.ms_todo_id, sub.id);
+      await api.delete(`/todo/action/${action.id}/subtask/${sub.id}`);
+    } catch (err) {
+      // Roll back
+      setActions(prev => prev.map(a => {
+        if (a.id !== action.id) return a;
+        const subs = parseSubtasks(a.subtasks);
+        return { ...a, subtasks: [...subs, sub] };
+      }));
+      console.error('Unteraufgabe löschen fehlgeschlagen:', err);
+    }
+  };
+
   const renderSubtasks = (action: Action) => {
     const subs = parseSubtasks(action.subtasks);
-    if (subs.length === 0) return null;
+    const isMsTodoAction = !!action.ms_todo_id && !!action.ms_todo_list_id;
+    if (!isMsTodoAction && subs.length === 0) return null;
+
     const done = subs.filter(s => s.isChecked).length;
+    const addingNow = addingSubtask.current.has(action.id);
     return (
       <div className="mb-3 pl-2 border-l-2 border-blue-200 dark:border-blue-800">
-        <div className="text-xs text-text-secondary mb-1.5">
-          Unteraufgaben ({done} / {subs.length})
-        </div>
+        {subs.length > 0 && (
+          <div className="text-xs text-text-secondary mb-1.5">
+            Unteraufgaben ({done} / {subs.length})
+          </div>
+        )}
         <ul className="space-y-1">
           {subs.map(sub => {
             const key = `${action.id}:${sub.id}`;
             const isToggling = togglingSubtasks.current.has(key);
             return (
-              <li key={sub.id} className="flex items-start gap-2 text-sm">
+              <li key={sub.id} className="group flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={sub.isChecked}
@@ -619,10 +700,41 @@ export function Actions() {
                 <span className={`flex-1 ${sub.isChecked ? 'line-through text-text-secondary' : 'text-text'}`}>
                   {sub.displayName}
                 </span>
+                {isMsTodoAction && (
+                  <button
+                    onClick={() => deleteSubtask(action, sub)}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 text-text-secondary hover:text-red-600 transition-all"
+                    title="Unteraufgabe löschen"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
               </li>
             );
           })}
         </ul>
+        {isMsTodoAction && (
+          <div className="flex items-center gap-2 mt-2 text-sm">
+            <input
+              type="text"
+              value={newSubtaskText[action.id] ?? ''}
+              onChange={(e) => setNewSubtaskText(prev => ({ ...prev, [action.id]: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addSubtask(action); } }}
+              placeholder="+ Unteraufgabe hinzufügen"
+              disabled={addingNow}
+              className="flex-1 px-2 py-1 border border-border rounded bg-bg-secondary text-text text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            {(newSubtaskText[action.id] ?? '').trim().length > 0 && (
+              <button
+                onClick={() => addSubtask(action)}
+                disabled={addingNow}
+                className="px-2 py-1 bg-primary text-white rounded text-xs hover:bg-primary-dark transition-colors disabled:opacity-50"
+              >
+                {addingNow ? '…' : 'Add'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   };
