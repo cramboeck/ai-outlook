@@ -789,7 +789,8 @@ router.delete('/:id', async (req, res, next) => {
 // POST /api/integrations/:id/forward - Forward document to integration
 router.post('/:id/forward', async (req, res, next) => {
   try {
-    const { email_id, email_subject, document_data, action_id, attachment } = req.body;
+    const { email_id, email_subject, action_id, attachment } = req.body;
+    let { document_data } = req.body as { document_data?: Record<string, unknown> };
 
     const integration = await queryOne<any>(
       'SELECT * FROM integrations WHERE id = $1 AND tenant_id = $2 AND enabled = true',
@@ -798,6 +799,37 @@ router.post('/:id/forward', async (req, res, next) => {
 
     if (!integration) {
       return res.status(404).json({ error: 'Integration not found or disabled' });
+    }
+
+    // Quick-Forward fallback: if the caller did not pass document_data (manual
+    // direct-forward path) but the email has been analysed before, reuse the
+    // most recent action's extracted metadata. This lets SharePoint metadata
+    // columns / sevDesk taxes / Paperless custom fields stay populated without
+    // forcing the user to re-run the AI pipeline.
+    if (!document_data && email_id) {
+      try {
+        const prior = await queryOne<{ document_data: unknown }>(
+          `SELECT document_data FROM actions
+           WHERE tenant_id = $1 AND email_id = $2 AND document_data IS NOT NULL
+           ORDER BY created_at DESC LIMIT 1`,
+          [req.tenantId, email_id]
+        );
+        if (prior?.document_data) {
+          const parsed = typeof prior.document_data === 'string'
+            ? JSON.parse(prior.document_data)
+            : (prior.document_data as Record<string, unknown>);
+          document_data = parsed;
+          logger.info('Quick-Forward: reused prior document_data', {
+            integrationId: req.params.id,
+            emailId: email_id,
+            fieldCount: Object.keys(parsed).length,
+          });
+        }
+      } catch (err) {
+        logger.warn('Quick-Forward: prior metadata lookup failed', {
+          error: (err as Error).message,
+        });
+      }
     }
 
     // Parse config for post-forward URL construction

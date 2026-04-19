@@ -127,7 +127,10 @@ export const QuickForwardMenu = ({ email }: Props) => {
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-gray-50">
             <div className="text-sm font-semibold text-text">Schnell weiterleiten</div>
-            <div className="text-xs text-text-secondary">Direkt senden — ohne KI-Analyse</div>
+            <div className="text-xs text-text-secondary">
+              Direkt senden — ohne neue KI-Analyse. Bereits extrahierte Metadaten
+              (Lieferant, Betrag, Rechnungsnr.) werden automatisch mitgesendet.
+            </div>
           </div>
 
           <div className="max-h-80 overflow-y-auto">
