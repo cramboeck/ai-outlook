@@ -3,6 +3,9 @@
 import { Router } from 'express';
 import { query, queryOne } from '../db';
 import { getOrCreateTenant } from '../services/tenantService';
+import { evaluateRules, loadTenantRules } from '../engine/ruleEngine';
+import type { EmailForProcessing, Rule as EngineRule, RuleAction } from '../engine/ruleEngine';
+import { logger } from '../services/logger';
 
 const router = Router();
 
@@ -210,6 +213,100 @@ router.put('/reorder', async (req, res, next) => {
     );
 
     res.json({ rules });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/rules/evaluate-batch
+// Retroactive rule application: the frontend ships a batch of emails
+// (already fetched via Graph) and gets back which rules matched each one
+// + the action list to execute. The actual execution (move/delete/
+// categorize) happens client-side because only the browser has a valid
+// Graph token. Optional rule_id filter lets "Jetzt anwenden" buttons
+// target a single rule instead of the full active set.
+router.post('/evaluate-batch', async (req, res, next) => {
+  try {
+    const tenant = await getOrCreateTenant(req.tenantId!);
+    const ruleId = typeof req.body?.rule_id === 'string' ? req.body.rule_id : undefined;
+    const raw: unknown = req.body?.emails;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return res.json({ evaluations: [] });
+    }
+    if (raw.length > 500) {
+      return res.status(400).json({ error: 'Maximum 500 emails per batch' });
+    }
+
+    // Load either every active rule or just one, depending on the caller.
+    let rules: EngineRule[];
+    if (ruleId) {
+      const one = await queryOne<EngineRule>(
+        'SELECT * FROM rules WHERE id = $1 AND tenant_id = $2 AND enabled = true',
+        [ruleId, tenant.id]
+      );
+      rules = one ? [one] : [];
+    } else {
+      rules = await loadTenantRules(tenant.id);
+    }
+
+    // Normalise criteria/actions shape (pg returns JSONB as objects in most
+    // setups but as strings on some).
+    for (const r of rules) {
+      if (typeof r.criteria === 'string') r.criteria = JSON.parse(r.criteria as unknown as string);
+      if (typeof r.actions === 'string') r.actions = JSON.parse(r.actions as unknown as string);
+    }
+
+    const evaluations: Array<{
+      email_id: string;
+      matches: Array<{
+        rule_id: string;
+        rule_name: string;
+        matched_criteria: string[];
+        actions: RuleAction[];
+      }>;
+    }> = [];
+
+    for (const email of raw as Array<Record<string, unknown>>) {
+      const e: EmailForProcessing = {
+        id: String(email.id ?? ''),
+        subject: String(email.subject ?? ''),
+        bodyPreview: String(email.bodyPreview ?? ''),
+        body: String(email.body ?? ''),
+        senderEmail: String(email.sender ?? email.senderEmail ?? ''),
+        senderDomain: String(email.sender ?? email.senderEmail ?? '').split('@')[1]?.toLowerCase() ?? '',
+        importance: String(email.importance ?? 'normal'),
+        hasAttachments: Boolean(email.hasAttachments),
+        isDirectRecipient: email.isDirectRecipient == null ? true : Boolean(email.isDirectRecipient),
+        ccCount: Number(email.ccCount ?? 0),
+        isReply: /^(re:|aw:)/i.test(String(email.subject ?? '').trim()),
+        isForward: /^(fw:|wg:)/i.test(String(email.subject ?? '').trim()),
+        categories: Array.isArray(email.categories) ? (email.categories as string[]) : [],
+        receivedDateTime: email.receivedDateTime as string | undefined,
+      };
+
+      if (!e.id) continue;
+      const matches = await evaluateRules(tenant.id, e, rules);
+      if (matches.length > 0) {
+        evaluations.push({
+          email_id: e.id,
+          matches: matches.map(m => ({
+            rule_id: m.rule.id,
+            rule_name: m.rule.name,
+            matched_criteria: m.matchedCriteria,
+            actions: m.rule.actions,
+          })),
+        });
+      }
+    }
+
+    logger.info('Rule evaluate-batch', {
+      tenantId: tenant.id,
+      ruleId,
+      inputCount: raw.length,
+      matchedCount: evaluations.length,
+    });
+
+    res.json({ evaluations });
   } catch (error) {
     next(error);
   }

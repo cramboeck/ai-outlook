@@ -48,6 +48,7 @@ import { getMailFolders } from '../../services/graphService';
 import { buildFolderHierarchy, type FolderWithPath } from '../../services/folderService';
 import { getActiveCategories } from '../../services/categoryService';
 import type { Category } from '../../types';
+import { ApplyRulesDialog } from '../ApplyRulesDialog';
 
 interface RuleEditModalProps {
   rule: EmailRule | null;
@@ -491,6 +492,7 @@ export const RulesManager = () => {
   const [isNewRule, setIsNewRule] = useState(false);
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [applyDialog, setApplyDialog] = useState<{ ruleId?: string; ruleName?: string } | null>(null);
 
   // Merge local + server rules. Server wins on id collision (canonical source
   // for everything created via Smart-Rules or the backend). Local-only rules
@@ -839,6 +841,13 @@ export const RulesManager = () => {
                       </span>
                     )}
                     <button
+                      onClick={() => setApplyDialog({ ruleId: rule.id, ruleName: rule.name })}
+                      className="p-1.5 text-text-secondary hover:text-primary transition-colors"
+                      title="Jetzt auf Inbox anwenden"
+                    >
+                      <Play className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => handleEditRule(rule)}
                       className="p-1.5 text-text-secondary hover:text-primary transition-colors"
                       title="Bearbeiten"
@@ -911,7 +920,15 @@ export const RulesManager = () => {
 
         {/* Actions */}
         <div className="flex items-center justify-between pt-4 border-t border-border">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setApplyDialog({})}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors font-medium"
+              title="Alle aktiven Regeln auf bestehende Inbox anwenden"
+            >
+              <Play className="w-4 h-4" />
+              Alle Regeln anwenden
+            </button>
             <button
               onClick={handleExport}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-text-secondary hover:text-text hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -950,6 +967,13 @@ export const RulesManager = () => {
           onClose={() => setShowEditModal(false)}
         />
       )}
+
+      <ApplyRulesDialog
+        isOpen={applyDialog !== null}
+        ruleId={applyDialog?.ruleId}
+        ruleName={applyDialog?.ruleName}
+        onClose={() => setApplyDialog(null)}
+      />
     </div>
   );
 };
