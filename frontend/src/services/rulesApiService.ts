@@ -47,6 +47,62 @@ export async function reorderServerRules(ruleIds: string[]): Promise<EmailRule[]
   return (data.rules || []).map(mapToEmailRule);
 }
 
+// --- Smart Rule Suggestion ------------------------------------------------
+
+export type SuggestedCriterionField =
+  | 'fromContains'
+  | 'fromExact'
+  | 'fromDomain'
+  | 'subjectContains'
+  | 'subjectStartsWith'
+  | 'bodyContains'
+  | 'hasAttachments'
+  | 'importance';
+
+export interface SuggestedCriterion {
+  field: SuggestedCriterionField;
+  value: string | boolean;
+  description: string;
+  enabled: boolean;
+}
+
+export type SuggestedActionType = 'categorize' | 'move' | 'markRead' | 'flag';
+
+export interface SuggestedAction {
+  type: SuggestedActionType;
+  value: string;
+  description: string;
+  enabled: boolean;
+}
+
+export interface RuleSuggestion {
+  suggestedName: string;
+  suggestedDescription: string;
+  suggestedPriority: number;
+  suggestedStopProcessing: boolean;
+  criteria: SuggestedCriterion[];
+  actions: SuggestedAction[];
+  reasoning: string;
+}
+
+export interface SuggestRuleFromEmailInput {
+  subject?: string;
+  body?: string;
+  sender?: string;
+  hasAttachments?: boolean;
+  importance?: 'high' | 'normal' | 'low';
+}
+
+export async function suggestRuleFromEmail(
+  input: SuggestRuleFromEmailInput
+): Promise<RuleSuggestion> {
+  const data = await api.post<{ suggestion: RuleSuggestion }>(
+    '/suggest-rule-from-email',
+    input
+  );
+  return data.suggestion;
+}
+
 // Sync local rules to server (one-way push)
 export async function syncLocalRulesToServer(
   localRules: EmailRule[]

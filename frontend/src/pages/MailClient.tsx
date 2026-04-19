@@ -12,6 +12,7 @@ import { ClassificationResult } from '../components/classification/Classificatio
 import { BatchClassifyModal } from '../components/classification/BatchClassifyModal';
 import { ReplyModal } from '../components/email/ReplyModal';
 import { SearchModal } from '../components/mail/SearchModal';
+import { SmartRuleFromEmailModal } from '../components/SmartRuleFromEmailModal';
 import { useClassify } from '../hooks/useClassify';
 import {
   getEmailsFromFolder,
@@ -44,6 +45,10 @@ export const MailClient = () => {
   const [isApplying, setIsApplying] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any | null>(null);
+
+  // Smart-Rule-from-Email modal
+  const [ruleSuggestEmail, setRuleSuggestEmail] = useState<Email | null>(null);
+  const [ruleCreatedMsg, setRuleCreatedMsg] = useState<string | null>(null);
 
   const account = accounts[0];
   const userName = account?.name || 'Freundliche Grüße';
@@ -412,6 +417,7 @@ export const MailClient = () => {
             onReply={handleReplyClick}
             onClassify={!isSentFolder && !isFollowUp ? handleClassifyEmail : undefined}
             onAnalyze={!isSentFolder && !isFollowUp ? handleAnalyzeEmail : undefined}
+            onSuggestRule={!isSentFolder ? (email) => setRuleSuggestEmail(email) : undefined}
             isAnalyzing={isAnalyzing}
             onDelete={() => refetch()}
             onMoved={() => {
@@ -459,6 +465,23 @@ export const MailClient = () => {
         onClose={() => setIsSearchModalOpen(false)}
         onMoved={() => refetch()}
       />
+
+      {/* Smart Rule Suggest Modal */}
+      <SmartRuleFromEmailModal
+        isOpen={!!ruleSuggestEmail}
+        email={ruleSuggestEmail}
+        onClose={() => setRuleSuggestEmail(null)}
+        onCreated={(name) => {
+          setRuleCreatedMsg(`Regel "${name}" wurde angelegt.`);
+          setTimeout(() => setRuleCreatedMsg(null), 4000);
+        }}
+      />
+
+      {ruleCreatedMsg && (
+        <div className="fixed bottom-6 right-6 z-[60] px-4 py-3 rounded-lg bg-emerald-600 text-white text-sm shadow-lg">
+          {ruleCreatedMsg}
+        </div>
+      )}
     </div>
   );
 };

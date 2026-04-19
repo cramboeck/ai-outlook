@@ -2,10 +2,13 @@
 // Wraps Azure OpenAI calls for the Express server
 
 import { Router } from 'express';
+import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { classifySchema, classifyBatchSchema, extractActionsSchema, generateReplySchema, suggestFolderSchema } from '../schemas/ai.schema';
 import { getOpenAIClient, getModel, getProvider, isAIConfigured, wrapSystemPrompt } from '../services/openaiClient';
 import { isOboConfigured } from '../services/authService';
+import { suggestRuleFromEmail } from '../services/ruleSuggestionService';
+import { query } from '../db';
 import { logger } from '../services/logger';
 
 const router = Router();
@@ -459,6 +462,53 @@ ${folderList}
     res.json(result);
   } catch (error) {
     logger.error('Suggest folder error', { error: (error as Error).message, tenantId: req.tenantId });
+    next(error);
+  }
+});
+
+// POST /api/suggest-rule-from-email — given a representative email, propose
+// toggleable criteria and actions for a new automation rule. The frontend
+// shows the result in a modal so the user can pick what to keep.
+const suggestRuleSchema = z.object({
+  subject: z.string().max(2000).optional().default(''),
+  body: z.string().max(20_000).optional().default(''),
+  sender: z.string().max(500).optional().default(''),
+  hasAttachments: z.boolean().optional().default(false),
+  importance: z.enum(['high', 'normal', 'low']).optional(),
+}).refine(d => (d.subject || d.body || d.sender), {
+  message: 'At least one of subject / body / sender is required',
+});
+
+router.post('/suggest-rule-from-email', validate(suggestRuleSchema), async (req, res, next) => {
+  try {
+    // Load tenant category names so the LLM suggests a valid categorize value.
+    const cats = await query<{ name: string }>(
+      'SELECT name FROM categories WHERE tenant_id = $1 ORDER BY sort_order, name',
+      [req.tenantId]
+    );
+    const availableCategories = cats.map(c => c.name);
+
+    const body = req.body as z.infer<typeof suggestRuleSchema>;
+    const result = await suggestRuleFromEmail({
+      subject: body.subject,
+      body: body.body,
+      sender: body.sender,
+      hasAttachments: body.hasAttachments,
+      importance: body.importance,
+      availableCategories,
+    });
+
+    res.json({
+      suggestion: result.suggestion,
+      model: result.model,
+      tokens: result.usage,
+      processingTimeMs: result.processingTimeMs,
+    });
+  } catch (error) {
+    logger.error('Suggest rule error', {
+      error: (error as Error).message,
+      tenantId: req.tenantId,
+    });
     next(error);
   }
 });

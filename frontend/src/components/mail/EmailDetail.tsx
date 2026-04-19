@@ -13,6 +13,7 @@ import {
   User,
   Calendar,
   Star,
+  Wand2,
 } from 'lucide-react';
 import type { Email } from '../../types';
 import { getEmailWithBody, markEmailAsRead, deleteEmail } from '../../services/graphService';
@@ -26,6 +27,7 @@ interface EmailDetailProps {
   onForward?: (email: Email) => void;
   onClassify?: (email: Email) => void;
   onAnalyze?: (email: Email) => void;
+  onSuggestRule?: (email: Email) => void;
   isAnalyzing?: boolean;
   onDelete?: () => void;
   onMoved?: () => void;
@@ -40,6 +42,7 @@ export const EmailDetail = ({
   onForward,
   onClassify,
   onAnalyze,
+  onSuggestRule,
   isAnalyzing = false,
   onDelete,
   onMoved,
@@ -143,6 +146,16 @@ export const EmailDetail = ({
             >
               <Sparkles className="w-4 h-4" />
               KI
+            </button>
+          )}
+          {onSuggestRule && (
+            <button
+              onClick={() => onSuggestRule(fullEmail || email)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-violet-400 text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"
+              title="KI schlägt eine Regel vor, die ähnliche E-Mails zukünftig automatisch verarbeitet"
+            >
+              <Wand2 className="w-4 h-4" />
+              Regel
             </button>
           )}
           {onAnalyze && (
