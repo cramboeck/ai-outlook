@@ -119,15 +119,24 @@ const CONFIG_FIELDS: Record<IntegrationType, { key: string; label: string; place
   ],
 };
 
-const METADATA_FIELDS: { key: string; label: string }[] = [
-  { key: 'vendor', label: 'Lieferant' },
-  { key: 'amount', label: 'Betrag' },
-  { key: 'invoiceNumber', label: 'Rechnungsnummer' },
-  { key: 'date', label: 'Datum' },
-  { key: 'dueDate', label: 'Fälligkeitsdatum' },
-  { key: 'currency', label: 'Währung' },
-  { key: 'iban', label: 'IBAN' },
-  { key: 'documentType', label: 'Dokumenttyp' },
+const METADATA_FIELDS: { key: string; label: string; group?: string }[] = [
+  // KI-extrahierte Felder (kommen aus document_data nach "Analysieren")
+  { key: 'vendor', label: 'Lieferant', group: 'KI' },
+  { key: 'amount', label: 'Betrag', group: 'KI' },
+  { key: 'invoiceNumber', label: 'Rechnungsnummer', group: 'KI' },
+  { key: 'orderNumber', label: 'Bestellnummer', group: 'KI' },
+  { key: 'date', label: 'Datum', group: 'KI' },
+  { key: 'dueDate', label: 'Fälligkeitsdatum', group: 'KI' },
+  { key: 'currency', label: 'Währung', group: 'KI' },
+  { key: 'iban', label: 'IBAN', group: 'KI' },
+  { key: 'taxRate', label: 'USt-Satz', group: 'KI' },
+  { key: 'documentType', label: 'Dokumenttyp', group: 'KI' },
+  // Manuell vom User im Quick-Forward-Modal gepflegte Felder
+  { key: 'customer', label: 'Kunde', group: 'Manuell' },
+  { key: 'project', label: 'Projekt', group: 'Manuell' },
+  { key: 'costCenter', label: 'Kostenstelle', group: 'Manuell' },
+  { key: 'department', label: 'Abteilung', group: 'Manuell' },
+  { key: 'reference', label: 'Referenz', group: 'Manuell' },
 ];
 
 const CONDITION_FIELDS: { key: string; label: string; numeric?: boolean }[] = [

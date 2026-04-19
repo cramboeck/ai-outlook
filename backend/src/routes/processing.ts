@@ -87,6 +87,13 @@ async function persistResults(
     // 2. Persist detected document as action
     if (result.document) {
       const docDescription = buildDocumentDescription(result.document);
+      // Merge the doc type into document_data so SharePoint metadata mappings
+      // can target it via either `type` or `documentType` keys.
+      const documentDataForPersist = {
+        ...(result.document.extractedData || {}),
+        type: result.document.type,
+        documentType: result.document.type,
+      };
       const rows = await query(
         `INSERT INTO actions (tenant_id, user_id, email_id, email_subject, email_sender, description, action_type, priority, status, source, document_type, document_data)
          VALUES ($1, $2, $3, $4, $5, $6, 'document', 'medium', 'open', 'ai', $7, $8)
@@ -99,7 +106,7 @@ async function persistResults(
           email.senderEmail,
           docDescription,
           result.document.type,
-          JSON.stringify(result.document.extractedData || {}),
+          JSON.stringify(documentDataForPersist),
         ]
       );
 

@@ -694,9 +694,14 @@ export const getTodoTasks = async (
   includeCompleted: boolean = false
 ): Promise<TodoTask[]> => {
   const client = getGraphClient();
+  // Note: linkedResources is a navigation property — Graph rejects it inside
+  // $select with a 400 ("Invalid request"). It has to be requested via
+  // $expand instead. We also drop $select entirely on the scalar fields:
+  // payloads stay small and any future field addition (e.g. recurrence)
+  // requires no client change.
   let request = client
     .api(`/me/todo/lists/${listId}/tasks`)
-    .select('id,title,body,status,importance,isReminderOn,createdDateTime,lastModifiedDateTime,completedDateTime,dueDateTime,categories,linkedResources')
+    .expand('linkedResources')
     .top(top)
     .orderby('createdDateTime desc');
 
