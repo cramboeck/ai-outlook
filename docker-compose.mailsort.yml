@@ -1,24 +1,34 @@
-# MailSort Production Stack
+# MailSort Production Stack — für srv-docker01
 #
-# Runs alongside other Docker apps on the same host. Container ports are
-# bound to 127.0.0.1 only — the host-side nginx handles TLS + public
-# routing (see deploy/nginx-mailsort.conf).
+# Läuft neben ramboflow + bookstack auf demselben Host. Kein neuer
+# Reverse-Proxy: MailSort hängt sich in das existierende
+# `timetracking_app_ramboflow-network` ein und lässt sich vom
+# ramboflow-nginx auf mailsort-frontend:80 / mailsort-backend:7071
+# proxyen. Keine Ports auf den Host — reine Container-zu-Container-
+# Kommunikation über Docker-DNS.
 #
-# Usage:
-#   1. Copy .env.prod.example → .env.prod and fill in the secrets.
-#   2. Point your DNS record for the chosen domain at this host.
-#   3. Copy deploy/nginx-mailsort.conf into /etc/nginx/sites-available/
-#      and enable it. Issue a Let's Encrypt cert with certbot.
-#   4. docker compose -f docker-compose.mailsort.yml --env-file .env.prod up -d --build
-#   5. docker compose -f docker-compose.mailsort.yml exec backend node dist/db/migrate.js
-#      (only on first deploy or after new migrations)
+# Erst-Deployment:
+#   1. .env.prod.example → .env.prod, Werte ausfüllen
+#   2. docker compose -f docker-compose.mailsort.yml --env-file .env.prod up -d --build
+#   3. Migrationen: docker compose ... exec backend npx tsx src/db/migrate.ts
+#   4. vhost-Snippet aus deploy/nginx-mailsort.conf in
+#      /home/timetracking_app/timetracking_app/nginx/nginx.production.conf einfügen
+#   5. Cert holen: siehe deploy/README.md → "Zertifikat für neue Subdomain"
+#   6. docker exec ramboflow-nginx nginx -s reload
 
 name: mailsort
 
 networks:
+  # Privates MailSort-Netz für DB + Backup-Sidecar.
   mailsort-net:
     name: mailsort-net
     driver: bridge
+
+  # Existierendes Netz vom ramboflow-Stack — hier hängt sich der Reverse
+  # Proxy dran. Wir joinen es als external, um von dort proxied zu werden.
+  ramboflow-network:
+    name: timetracking_app_ramboflow-network
+    external: true
 
 volumes:
   postgres-data:
@@ -35,12 +45,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      # Keep pg_dump / psql defaults deterministic for the backup sidecar.
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     networks:
+      # Nur im internen Netz — kein Zugriff vom Reverse-Proxy oder Host.
       - mailsort-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -48,7 +58,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    # No ports exposed — access only from other containers on mailsort-net.
 
   backend:
     build:
@@ -68,11 +77,9 @@ services:
       DATABASE_SSL: "false"
       SKIP_AUTH: "false"
       CORS_ORIGIN: ${PUBLIC_URL}
-      # Azure AD
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
-      # AI provider — set ONE of the two blocks
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
       AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o-mini}
@@ -80,10 +87,9 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
     networks:
-      - mailsort-net
-    ports:
-      # Only reachable from the host itself — host-nginx proxies to this.
-      - "127.0.0.1:${BACKEND_HOST_PORT:-17071}:7071"
+      - mailsort-net          # → postgres
+      - ramboflow-network     # → ramboflow-nginx findet mich als "mailsort-backend"
+    # Keine ports! Zugriff erfolgt ausschließlich über ramboflow-nginx.
 
   frontend:
     build:
@@ -100,10 +106,7 @@ services:
       backend:
         condition: service_started
     networks:
-      - mailsort-net
-    ports:
-      # Host-nginx proxies to this. Public HTTPS termination is on the host.
-      - "127.0.0.1:${FRONTEND_HOST_PORT:-17080}:80"
+      - ramboflow-network     # → ramboflow-nginx findet mich als "mailsort-frontend"
 
   postgres-backup:
     image: postgres:16-alpine
@@ -124,8 +127,6 @@ services:
     networks:
       - mailsort-net
     entrypoint: ["/bin/sh", "-c"]
-    # Simple cron loop: nightly at 02:15 UTC + prune. Keeps the container
-    # single-purpose and dependency-free.
     command: >
       "chmod +x /usr/local/bin/backup.sh &&
        while true; do

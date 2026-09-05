@@ -1,19 +1,46 @@
-# MailSort — Hetzner-Deployment
+# MailSort — Deployment auf srv-docker01 (Hetzner)
 
-Läuft neben anderen Docker-Apps auf demselben Host. Der host-seitige nginx
-terminiert TLS und routet public Traffic auf die MailSort-Container.
+MailSort läuft neben **ramboflow** und **bookstack** auf demselben Docker-Host.
+Kein neuer Reverse-Proxy: der bestehende `ramboflow-nginx` proxied auf MailSort.
+Zertifikate laufen über den bestehenden `ramboflow-certbot`.
+
+## Architektur
+
+```
+Internet
+   │
+   ▼  Port 443
+┌─────────────────────┐
+│   ramboflow-nginx   │ ← unverändert, bekommt neuen vhost für mail.ramboeck.it
+└──────────┬──────────┘
+           │  Container-DNS: mailsort-backend / mailsort-frontend
+           ▼
+      timetracking_app_ramboflow-network   ← shared external network
+           │
+    ┌──────┴──────┐
+    ▼             ▼
+┌────────┐  ┌──────────┐
+│frontend│  │ backend  │
+│ (nginx)│  │  (node)  │
+└────────┘  └────┬─────┘
+                 │  mailsort-net (privat, isoliert)
+                 ▼
+           ┌──────────┐   ┌──────────────────┐
+           │postgres  │←──│ postgres-backup  │ (täglich 02:15 UTC)
+           └──────────┘   └──────────────────┘
+```
 
 ## Voraussetzungen
 
-- Docker + Docker Compose auf dem Host
-- Bestehendes host-nginx mit certbot
-- Eine (Sub-)Domain mit A-Record auf den Host, z.B. `mailsort.example.com`
-- Azure-AD-App-Registration (Multi-Tenant, siehe `SETUP.md` im Repo-Root)
-- Azure-OpenAI-Deployment ODER ein erreichbarer Ollama-Host
+- Docker >= 24, Compose v2 ✓ (`Server 29.1.3` bei dir)
+- Domain / Subdomain, A-Record auf den Host, z.B. `mail.ramboeck.it`
+- Azure-AD-App-Registration (Multi-Tenant, siehe `SETUP.md`)
+- Azure-OpenAI-Deployment oder Ollama-Erreichbarkeit
 
-## Erst-Deployment (10 Minuten)
+## Erst-Deployment
 
-### 1. Repo aufs Server klonen
+### 1. Repo klonen
+
 ```bash
 sudo mkdir -p /opt/mailsort && sudo chown $USER: /opt/mailsort
 cd /opt/mailsort
@@ -21,135 +48,196 @@ git clone https://github.com/cramboeck/ai-outlook.git .
 git checkout claude/mailsort-ai-outlook-BP7Qb
 ```
 
-### 2. Prod-Konfiguration anlegen
+### 2. Prod-Config erstellen
+
 ```bash
 cp .env.prod.example .env.prod
 $EDITOR .env.prod
 ```
 
-Alle Werte, die mit `change-me` / `your-*` markiert sind, ersetzen. Speziell:
-
-- `PUBLIC_URL` — die volle HTTPS-Adresse
-- `POSTGRES_PASSWORD` — mind. 32 Zeichen zufällig (`openssl rand -base64 32`)
-- `AZURE_CLIENT_ID` + `AZURE_CLIENT_SECRET` + `AZURE_TENANT_ID`
-- `AZURE_OPENAI_*` **oder** `OPENAI_*` — ein Block, nicht beide
+Werte anpassen:
+- `PUBLIC_URL=https://mail.ramboeck.it`
+- `POSTGRES_PASSWORD` — `openssl rand -base64 32` und rein
+- `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_ID`
+- **einen** AI-Provider-Block ausfüllen (Azure OpenAI oder Ollama)
 
 ### 3. Container bauen und starten
+
 ```bash
-docker compose -f docker-compose.mailsort.yml --env-file .env.prod up -d --build
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod up -d --build
 ```
 
-Der erste Build dauert ~3–5 Min (Node-Deps + Vite-Build).
+Erst-Build dauert ~4-6 Minuten auf ARM64. Danach:
 
-### 4. DB-Migrationen laufen lassen
 ```bash
-docker compose -f docker-compose.mailsort.yml --env-file .env.prod \
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod ps
+```
+
+Erwartet: alle 4 Container mit `(healthy)`.
+
+### 4. DB-Migrationen
+
+```bash
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod \
   exec backend npx tsx src/db/migrate.ts
 ```
 
-*(Der Migrator läuft mit tsx — auch im Prod-Image installiert weil er nicht Teil des kompilierten JS ist.)*
-
 Ausgabe muss enden mit `✅ Applied N migration(s)` oder `✅ Database is up to date`.
 
-### 5. Host-nginx konfigurieren
-```bash
-sudo cp deploy/nginx-mailsort.conf /etc/nginx/sites-available/mailsort.conf
-sudo $EDITOR /etc/nginx/sites-available/mailsort.conf
-# → mailsort.example.com durch echte Domain ersetzen
-sudo ln -s /etc/nginx/sites-available/mailsort.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+### 5. Zertifikat für neue Subdomain holen
+
+Der `ramboflow-certbot`-Container ist bereits da — wir nutzen ihn.
+
+**5a.** Der HTTP-Redirect-Block muss temporär auch ohne SSL-Cert funktionieren.
+Erst einen minimalen HTTP-only Block in `nginx.production.conf` einfügen:
+
+```nginx
+server {
+    listen 80;
+    server_name mail.ramboeck.it;
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 404; }
+}
 ```
 
-### 6. HTTPS via Let's Encrypt
+nginx reloaden:
 ```bash
-sudo certbot --nginx -d mailsort.example.com
+sudo docker exec ramboflow-nginx nginx -t
+sudo docker exec ramboflow-nginx nginx -s reload
 ```
 
-Certbot injiziert die Cert-Pfade automatisch in `mailsort.conf` und lädt nginx.
-
-### 7. Health-Check
+**5b.** DNS-A-Record auf den Server-IP setzen (Falls noch nicht). Prüfen:
 ```bash
-curl https://mailsort.example.com/api/health
+dig +short mail.ramboeck.it
+```
+
+**5c.** Zertifikat holen (via ramboflow-certbot):
+```bash
+sudo docker exec ramboflow-certbot certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d mail.ramboeck.it \
+  --email deine@email.de --agree-tos --no-eff-email
+```
+
+**5d.** Jetzt den finalen vhost-Snippet aus `deploy/nginx-mailsort.conf` einfügen:
+```bash
+# Öffne die nginx-Config
+sudo $EDITOR /home/timetracking_app/timetracking_app/nginx/nginx.production.conf
+```
+
+Kopiere den kompletten Inhalt von `deploy/nginx-mailsort.conf` in den `http { ... }`
+Block, direkt neben die anderen `server { }` Blöcke. Ersetze `mail.ramboeck.it`
+falls du eine andere Subdomain nutzt.
+
+Den temporären HTTP-only Block aus 5a löschen (der neue Snippet hat einen
+vollwertigen HTTP-Redirect drin).
+
+```bash
+sudo docker exec ramboflow-nginx nginx -t
+sudo docker exec ramboflow-nginx nginx -s reload
+```
+
+### 6. Sanity-Check
+
+```bash
+curl -sSf https://mail.ramboeck.it/api/health | jq
 ```
 
 Erwartete Antwort:
 ```json
-{"status":"healthy","database":"connected","engine":"postgresql",...}
+{
+  "status": "healthy",
+  "database": "connected",
+  "engine": "postgresql",
+  ...
+}
 ```
+
+Im Browser: `https://mail.ramboeck.it` → MailSort-Landing-Page.
 
 ## Update-Deployment
 
-Für jeden neuen Commit auf dem Prod-Branch:
+Nach neuen Commits:
 
 ```bash
 cd /opt/mailsort
 git pull
-docker compose -f docker-compose.mailsort.yml --env-file .env.prod up -d --build
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod up -d --build
 
-# Bei neuen Migrationen zusätzlich:
-docker compose -f docker-compose.mailsort.yml --env-file .env.prod \
+# Nur wenn neue Migrationen dabei waren:
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod \
   exec backend npx tsx src/db/migrate.ts
 ```
 
-Rolling: zuerst Backend, dann Frontend — Compose macht das automatisch,
-solange die Backend-Health-Checks grün gehen.
+## Backup & Restore
 
-## Backups
+Der `mailsort-postgres-backup`-Container macht **nächtlich 02:15 UTC** einen
+`pg_dump | gzip` ins Volume `mailsort-postgres-backups`.
 
-Der `mailsort-postgres-backup`-Container macht **nächtlich um 02:15 UTC**
-einen `pg_dump | gzip` in `mailsort-postgres-backups`.
-
-Restore aus einem Backup:
+**Backups auflisten:**
 ```bash
-# Backup-Datei aus dem Volume holen
-docker run --rm -v mailsort-postgres-backups:/backups alpine \
-  ls -la /backups
-
-# Wiederherstellen (macht die aktuelle DB platt!)
-BACKUP=mailsort_20260420T021500Z.sql.gz
-docker run --rm -v mailsort-postgres-backups:/backups alpine \
-  gunzip -c /backups/${BACKUP} > /tmp/restore.sql
-
-docker compose -f docker-compose.mailsort.yml exec -T postgres \
-  psql -U mailsort -d mailsort < /tmp/restore.sql
+sudo docker run --rm -v mailsort-postgres-backups:/backups alpine ls -la /backups
 ```
 
-Off-Site-Backup empfohlen: eine Cron auf dem Host, die den `mailsort-postgres-backups`-Ordner zu Hetzner Storage Box / S3 synced.
+**Restore (überschreibt aktuelle DB!):**
+```bash
+BACKUP=mailsort_20260420T021500Z.sql.gz
+
+sudo docker run --rm -v mailsort-postgres-backups:/backups alpine \
+  gunzip -c /backups/${BACKUP} > /tmp/restore.sql
+
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod exec -T \
+  postgres psql -U mailsort -d mailsort < /tmp/restore.sql
+```
+
+**Off-Site empfohlen:** Cron auf dem Host sichert `/var/lib/docker/volumes/mailsort-postgres-backups/` auf Hetzner Storage Box.
 
 ## Diagnose
 
 ```bash
-# Live-Logs von allen Containern
-docker compose -f docker-compose.mailsort.yml logs -f
+# Alle Container + Health
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod ps
 
-# Nur Backend
-docker compose -f docker-compose.mailsort.yml logs -f backend
+# Backend-Logs
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod logs -f backend
 
-# Ist die DB erreichbar aus dem Backend?
-docker compose -f docker-compose.mailsort.yml exec backend \
-  node -e "require('pg').Client && console.log('pg lib loaded')"
+# Von ramboflow-nginx aus prüfen ob mailsort-backend erreichbar
+sudo docker exec ramboflow-nginx wget -qO- http://mailsort-backend:7071/api/health
 
-# Container-Status + Health
-docker compose -f docker-compose.mailsort.yml ps
+# Von ramboflow-nginx aus prüfen ob mailsort-frontend erreichbar
+sudo docker exec ramboflow-nginx wget -qO- http://mailsort-frontend/ | head -20
 ```
 
-## Alles wieder abbauen
+## Docker-Group (Bequemlichkeit)
+
+Wenn du kein `sudo` bei jedem `docker`-Command tippen willst:
 
 ```bash
-docker compose -f docker-compose.mailsort.yml --env-file .env.prod down
+sudo usermod -aG docker $USER
+# Neu einloggen, dann funktioniert docker ohne sudo
 ```
 
-Mit `-v` zusätzlich werden Volumes gelöscht — **das killt alle Daten und Backups**, nur bewusst nutzen:
+## Alles zurückbauen
+
 ```bash
-docker compose -f docker-compose.mailsort.yml --env-file .env.prod down -v
+# Container weg, Daten + Backups bleiben
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod down
+
+# Nginx vhost zurücknehmen: die eingefügten server{} Blöcke in
+# /home/timetracking_app/timetracking_app/nginx/nginx.production.conf löschen
+# und ramboflow-nginx reloaden.
+
+# Volumes UND Backups löschen (nicht umkehrbar):
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod down -v
 ```
 
 ## Häufige Stolpersteine
 
 | Symptom | Ursache | Fix |
 |---|---|---|
-| `502 Bad Gateway` beim Aufruf | Container nicht up oder Port-Mapping falsch | `docker compose ps` — sind alle drei up? `.env.prod`-Ports mit `nginx-mailsort.conf` konsistent? |
-| Frontend lädt, API-Calls 404 | `VITE_API_URL` beim Build falsch gesetzt | `.env.prod` prüfen, `--build` beim Compose-Command mitgeben |
-| Login-Popup schließt sofort | Azure-AD Redirect-URI nicht registriert | Im Azure-Portal: App-Registration → Authentifizierung → `https://mailsort.example.com` hinzufügen |
-| „consent_required" beim ersten Login | Admin-Consent für Graph-Scopes fehlt | Azure-Portal → API-Berechtigungen → „Admin-Zustimmung erteilen" |
-| Copilot-Panel erscheint nicht | `AZURE_CLIENT_SECRET` fehlt oder Tenant hat keine Copilot-Lizenz | Backend-Logs nach `copilot:` grep'en, Ursache siehe `SETUP.md` §4 |
+| `502 Bad Gateway` von nginx | mailsort-container down oder nicht im shared network | `docker inspect mailsort-frontend` → `Networks: timetracking_app_ramboflow-network` muss drin sein |
+| `nginx: host not found in upstream "mailsort-backend"` | MailSort läuft noch nicht ODER nginx wurde vor MailSort-up gereloaded | `docker compose ps` prüfen, dann `docker exec ramboflow-nginx nginx -s reload` |
+| Certbot-Renewal schlägt fehl | Der neue vhost-HTTP-Block hat kein `/.well-known/acme-challenge/`-mapping | im Snippet oben ist es drin — nicht rausbauen |
+| Frontend lädt, API 404 | `VITE_API_URL` beim Build falsch | `.env.prod` prüfen (`PUBLIC_URL=https://...`), Frontend neu bauen mit `--build` |
+| Login-Popup schließt sofort | Redirect-URI nicht in Azure AD | Azure Portal → App-Registrierung → Authentifizierung → `https://mail.ramboeck.it` hinzufügen |
+| Copilot-Panel erscheint nicht | Client-Secret fehlt oder kein Consent | Logs nach `copilot:` grep'en, siehe `SETUP.md` §4 |
