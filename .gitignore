@@ -40,3 +40,5 @@ obj/
 
 # Local SQLite dev database
 backend/data/
+.env.prod
+deploy/backups/

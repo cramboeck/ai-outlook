@@ -1,0 +1,134 @@
+# MailSort Production Stack
+#
+# Runs alongside other Docker apps on the same host. Container ports are
+# bound to 127.0.0.1 only — the host-side nginx handles TLS + public
+# routing (see deploy/nginx-mailsort.conf).
+#
+# Usage:
+#   1. Copy .env.prod.example → .env.prod and fill in the secrets.
+#   2. Point your DNS record for the chosen domain at this host.
+#   3. Copy deploy/nginx-mailsort.conf into /etc/nginx/sites-available/
+#      and enable it. Issue a Let's Encrypt cert with certbot.
+#   4. docker compose -f docker-compose.mailsort.yml --env-file .env.prod up -d --build
+#   5. docker compose -f docker-compose.mailsort.yml exec backend node dist/db/migrate.js
+#      (only on first deploy or after new migrations)
+
+name: mailsort
+
+networks:
+  mailsort-net:
+    name: mailsort-net
+    driver: bridge
+
+volumes:
+  postgres-data:
+    name: mailsort-postgres-data
+  postgres-backups:
+    name: mailsort-postgres-backups
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mailsort-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Keep pg_dump / psql defaults deterministic for the backup sidecar.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - mailsort-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # No ports exposed — access only from other containers on mailsort-net.
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: mailsort-backend:latest
+    container_name: mailsort-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 7071
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_SSL: "false"
+      SKIP_AUTH: "false"
+      CORS_ORIGIN: ${PUBLIC_URL}
+      # Azure AD
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      # AI provider — set ONE of the two blocks
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+    networks:
+      - mailsort-net
+    ports:
+      # Only reachable from the host itself — host-nginx proxies to this.
+      - "127.0.0.1:${BACKEND_HOST_PORT:-17071}:7071"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${PUBLIC_URL}/api
+        VITE_MSAL_CLIENT_ID: ${AZURE_CLIENT_ID}
+        VITE_MSAL_TENANT_ID: ${AZURE_TENANT_ID}
+    image: mailsort-frontend:latest
+    container_name: mailsort-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - mailsort-net
+    ports:
+      # Host-nginx proxies to this. Public HTTPS termination is on the host.
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-17080}:80"
+
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: mailsort-postgres-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - postgres-backups:/backups
+      - ./deploy/backup.sh:/usr/local/bin/backup.sh:ro
+    networks:
+      - mailsort-net
+    entrypoint: ["/bin/sh", "-c"]
+    # Simple cron loop: nightly at 02:15 UTC + prune. Keeps the container
+    # single-purpose and dependency-free.
+    command: >
+      "chmod +x /usr/local/bin/backup.sh &&
+       while true; do
+         sleep $$(( $$(date -d 'tomorrow 02:15' +%s) - $$(date +%s) ));
+         /usr/local/bin/backup.sh || echo 'Backup failed';
+       done"
