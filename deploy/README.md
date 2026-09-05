@@ -84,11 +84,40 @@ sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod \
 
 Ausgabe muss enden mit `✅ Applied N migration(s)` oder `✅ Database is up to date`.
 
-### 5. Zertifikat für neue Subdomain holen
+### 5. Sicherheitsnetz — VOR dem nginx-Touch
+
+**Kritisch:** der `ramboflow-nginx` bedient auch `app.ramboeck.it` und
+`docs.ramboeck.it`. Ein Syntax-Fehler in der Config kills beide. Deshalb
+immer diese vier Schritte einhalten:
+
+**5.0** Backup der nginx-Config anlegen:
+```bash
+sudo cp /home/timetracking_app/timetracking_app/nginx/nginx.production.conf \
+        /home/timetracking_app/timetracking_app/nginx/nginx.production.conf.bak
+```
+
+**5.0.1** Von ramboflow-nginx aus testen, dass MailSort intern erreichbar
+ist (SOLLTE JETZT SCHON KLAPPEN, wenn Container aus §3 laufen):
+```bash
+sudo docker exec ramboflow-nginx wget -qO- http://mailsort-backend:7071/api/health
+sudo docker exec ramboflow-nginx wget -qO- http://mailsort-frontend/ | head -3
+```
+Beide müssen Content zurückgeben. Wenn nicht → vhost noch NICHT einbauen,
+erst Container-Setup fixen.
+
+**5.0.2** Baseline-Check der bestehenden Apps (bevor irgendwas verändert
+wird — damit später klar ist ob eine Regression von uns kommt):
+```bash
+curl -sSf -o /dev/null -w "app:  %{http_code}\n" https://app.ramboeck.it
+curl -sSf -o /dev/null -w "docs: %{http_code}\n" https://docs.ramboeck.it
+```
+Beide 200 → alles ok, weiter. Sonst erst dessen Zustand klären.
+
+### 6. Zertifikat für neue Subdomain holen
 
 Der `ramboflow-certbot`-Container ist bereits da — wir nutzen ihn.
 
-**5a.** Der HTTP-Redirect-Block muss temporär auch ohne SSL-Cert funktionieren.
+**6a.** Der HTTP-Redirect-Block muss temporär auch ohne SSL-Cert funktionieren.
 Erst einen minimalen HTTP-only Block in `nginx.production.conf` einfügen:
 
 ```nginx
@@ -106,12 +135,12 @@ sudo docker exec ramboflow-nginx nginx -t
 sudo docker exec ramboflow-nginx nginx -s reload
 ```
 
-**5b.** DNS-A-Record auf den Server-IP setzen (Falls noch nicht). Prüfen:
+**6b.** DNS-A-Record auf den Server-IP setzen (Falls noch nicht). Prüfen:
 ```bash
 dig +short mail.ramboeck.it
 ```
 
-**5c.** Zertifikat holen (via ramboflow-certbot):
+**6c.** Zertifikat holen (via ramboflow-certbot):
 ```bash
 sudo docker exec ramboflow-certbot certbot certonly \
   --webroot -w /var/www/certbot \
@@ -119,7 +148,7 @@ sudo docker exec ramboflow-certbot certbot certonly \
   --email deine@email.de --agree-tos --no-eff-email
 ```
 
-**5d.** Jetzt den finalen vhost-Snippet aus `deploy/nginx-mailsort.conf` einfügen:
+**6d.** Jetzt den finalen vhost-Snippet aus `deploy/nginx-mailsort.conf` einfügen:
 ```bash
 # Öffne die nginx-Config
 sudo $EDITOR /home/timetracking_app/timetracking_app/nginx/nginx.production.conf
@@ -129,7 +158,7 @@ Kopiere den kompletten Inhalt von `deploy/nginx-mailsort.conf` in den `http { ..
 Block, direkt neben die anderen `server { }` Blöcke. Ersetze `mail.ramboeck.it`
 falls du eine andere Subdomain nutzt.
 
-Den temporären HTTP-only Block aus 5a löschen (der neue Snippet hat einen
+Den temporären HTTP-only Block aus 6a löschen (der neue Snippet hat einen
 vollwertigen HTTP-Redirect drin).
 
 ```bash
@@ -137,11 +166,17 @@ sudo docker exec ramboflow-nginx nginx -t
 sudo docker exec ramboflow-nginx nginx -s reload
 ```
 
-### 6. Sanity-Check
+### 7. Sanity-Check — jetzt auch die bestehenden Apps mittesten
 
 ```bash
+curl -sSf -o /dev/null -w "app:      %{http_code}\n" https://app.ramboeck.it
+curl -sSf -o /dev/null -w "docs:     %{http_code}\n" https://docs.ramboeck.it
+curl -sSf -o /dev/null -w "mailsort: %{http_code}\n" https://mail.ramboeck.it
 curl -sSf https://mail.ramboeck.it/api/health | jq
 ```
+
+Alle drei müssen 200 zeigen. Wenn `app` oder `docs` plötzlich nicht mehr
+200 sind, liegt das an unserem vhost — sofort Rollback (siehe unten).
 
 Erwartete Antwort:
 ```json
@@ -229,6 +264,28 @@ sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod down
 
 # Volumes UND Backups löschen (nicht umkehrbar):
 sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod down -v
+```
+
+## Sofort-Rollback
+
+Falls nach dem nginx-Reload die anderen Apps down sind:
+
+```bash
+# nginx-Config auf Backup zurücksetzen
+sudo cp /home/timetracking_app/timetracking_app/nginx/nginx.production.conf.bak \
+        /home/timetracking_app/timetracking_app/nginx/nginx.production.conf
+sudo docker exec ramboflow-nginx nginx -t
+sudo docker exec ramboflow-nginx nginx -s reload
+```
+
+Innerhalb von 5 Sekunden ist der alte Zustand wieder da. Danach den vhost-Snippet
+in Ruhe debuggen, statt unter Druck.
+
+Falls MailSort-Container Probleme machen (aber ramboflow läuft):
+
+```bash
+sudo docker compose -f docker-compose.mailsort.yml --env-file .env.prod down
+# Ramboflow und bookstack sind komplett unbeeinflusst.
 ```
 
 ## Häufige Stolpersteine
