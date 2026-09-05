@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sanitizeHtml } from '../../utils/sanitize';
+import { QuickForwardMenu } from '../email/QuickForwardMenu';
+import { EmailTimeline } from '../email/EmailTimeline';
 import {
   X,
   Reply,
@@ -8,10 +10,12 @@ import {
   Trash2,
   Paperclip,
   Sparkles,
+  ScanSearch,
   Loader2,
   User,
   Calendar,
   Star,
+  Wand2,
 } from 'lucide-react';
 import type { Email } from '../../types';
 import { getEmailWithBody, markEmailAsRead, deleteEmail } from '../../services/graphService';
@@ -24,6 +28,9 @@ interface EmailDetailProps {
   onReplyAll?: (email: Email) => void;
   onForward?: (email: Email) => void;
   onClassify?: (email: Email) => void;
+  onAnalyze?: (email: Email) => void;
+  onSuggestRule?: (email: Email) => void;
+  isAnalyzing?: boolean;
   onDelete?: () => void;
   onMoved?: () => void;
   showFolderSuggestion?: boolean;
@@ -36,6 +43,9 @@ export const EmailDetail = ({
   onReplyAll,
   onForward,
   onClassify,
+  onAnalyze,
+  onSuggestRule,
+  isAnalyzing = false,
   onDelete,
   onMoved,
   showFolderSuggestion = true,
@@ -138,6 +148,28 @@ export const EmailDetail = ({
             >
               <Sparkles className="w-4 h-4" />
               KI
+            </button>
+          )}
+          {onSuggestRule && (
+            <button
+              onClick={() => onSuggestRule(fullEmail || email)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-violet-400 text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"
+              title="KI schlägt eine Regel vor, die ähnliche E-Mails zukünftig automatisch verarbeitet"
+            >
+              <Wand2 className="w-4 h-4" />
+              Regel
+            </button>
+          )}
+          <QuickForwardMenu email={fullEmail || email} />
+          {onAnalyze && (
+            <button
+              onClick={() => onAnalyze(fullEmail || email)}
+              disabled={isAnalyzing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-emerald-500 text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
+              title="Vollständige Analyse: Kategorie, Aufgaben & Dokumente erkennen"
+            >
+              {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanSearch className="w-4 h-4" />}
+              Analysieren
             </button>
           )}
         </div>
@@ -259,6 +291,11 @@ export const EmailDetail = ({
             ) : (
               <p className="text-text-secondary">{email.bodyPreview}</p>
             )}
+          </div>
+
+          {/* Activity Timeline */}
+          <div className="px-6 pb-6">
+            <EmailTimeline emailId={email.id} />
           </div>
         </div>
       )}

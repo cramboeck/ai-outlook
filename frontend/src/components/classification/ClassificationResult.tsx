@@ -20,7 +20,7 @@ export const ClassificationResult = ({
     result.confidence >= 0.8 ? 'text-success' : result.confidence >= 0.5 ? 'text-warning' : 'text-error';
 
   return (
-    <div className="bg-white border border-border rounded-lg p-4 space-y-4">
+    <div className="bg-card border border-border rounded-lg p-4 space-y-4">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-text-secondary mb-2">Vorgeschlagene Kategorie:</p>

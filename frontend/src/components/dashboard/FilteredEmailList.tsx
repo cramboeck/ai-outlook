@@ -17,7 +17,7 @@ export const FilteredEmailList = ({
   onEmailClick,
 }: FilteredEmailListProps) => {
   return (
-    <div className="bg-white border-2 border-primary/30 rounded-xl overflow-hidden shadow-lg">
+    <div className="bg-card border-2 border-primary/30 rounded-xl overflow-hidden shadow-lg">
       {/* Header */}
       <div className="px-6 py-4 bg-primary/5 border-b border-primary/20 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -29,7 +29,7 @@ export const FilteredEmailList = ({
         </div>
         <button
           onClick={onClose}
-          className="p-2 hover:bg-white rounded-lg transition-colors"
+          className="p-2 hover:bg-card rounded-lg transition-colors"
         >
           <X className="w-5 h-5 text-text-secondary" />
         </button>

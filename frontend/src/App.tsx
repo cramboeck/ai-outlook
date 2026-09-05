@@ -14,6 +14,9 @@ import { Onboarding } from './pages/Onboarding';
 import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuditLog } from './pages/AuditLog';
+import { Actions } from './pages/Actions';
+import { Integrations } from './pages/Integrations';
+import { Documents } from './pages/Documents';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 
@@ -84,7 +87,10 @@ function App() {
               <Route path="/mail" element={<ErrorBoundary><MailClient /></ErrorBoundary>} />
               <Route path="/inbox" element={<Navigate to="/mail" replace />} />
               <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+              <Route path="/actions" element={<ErrorBoundary><Actions /></ErrorBoundary>} />
+              <Route path="/documents" element={<ErrorBoundary><Documents /></ErrorBoundary>} />
               <Route path="/audit" element={<ErrorBoundary><AuditLog /></ErrorBoundary>} />
+              <Route path="/integrations" element={<ErrorBoundary><Integrations /></ErrorBoundary>} />
             </Route>
 
             {/* Fallback redirect */}

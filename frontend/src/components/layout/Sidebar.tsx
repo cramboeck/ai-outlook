@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Mail, Settings, X, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Mail, Settings, X, ScrollText, PlugZap, ClipboardList, FileText } from 'lucide-react';
+import { AiProviderBadge } from './AiProviderBadge';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -9,7 +10,10 @@ interface SidebarProps {
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/mail', icon: Mail, label: 'E-Mail' },
+  { to: '/actions', icon: ClipboardList, label: 'Aufgaben' },
+  { to: '/documents', icon: FileText, label: 'Dokumente' },
   { to: '/audit', icon: ScrollText, label: 'Audit Log' },
+  { to: '/integrations', icon: PlugZap, label: 'Integrationen' },
   { to: '/settings', icon: Settings, label: 'Einstellungen' },
 ];
 
@@ -30,6 +34,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           fixed lg:static inset-y-0 left-0 z-50
           w-64 bg-white border-r border-border
           transform transition-transform duration-200 ease-in-out
+          flex flex-col
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
@@ -44,7 +49,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         </div>
 
         {/* Navigation */}
-        <nav className="px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -63,6 +68,9 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             </NavLink>
           ))}
         </nav>
+
+        {/* AI Provider Badge (footer) */}
+        <AiProviderBadge />
       </aside>
     </>
   );

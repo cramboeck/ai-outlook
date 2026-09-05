@@ -176,7 +176,7 @@ ${folderList}`;
         { role: 'user', content: userMessage },
       ],
       temperature: 0.3,
-      max_tokens: 500,
+      max_tokens: 100,
       response_format: { type: 'json_object' },
     });
 

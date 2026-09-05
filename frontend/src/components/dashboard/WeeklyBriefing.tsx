@@ -106,7 +106,7 @@ export const WeeklyBriefing = ({ emails }: WeeklyBriefingProps) => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg p-3 border border-border">
+        <div className="bg-card rounded-lg p-3 border border-border">
           <div className="flex items-center gap-2 text-text-secondary mb-1">
             <Mail className="w-4 h-4" />
             <span className="text-xs">Gesamt</span>
@@ -114,7 +114,7 @@ export const WeeklyBriefing = ({ emails }: WeeklyBriefingProps) => {
           <p className="text-2xl font-bold text-text">{briefing.total}</p>
         </div>
 
-        <div className="bg-white rounded-lg p-3 border border-border">
+        <div className="bg-card rounded-lg p-3 border border-border">
           <div className="flex items-center gap-2 text-text-secondary mb-1">
             <CheckCircle className="w-4 h-4" />
             <span className="text-xs">Gelesen</span>
@@ -122,7 +122,7 @@ export const WeeklyBriefing = ({ emails }: WeeklyBriefingProps) => {
           <p className="text-2xl font-bold text-green-600">{briefing.read}</p>
         </div>
 
-        <div className="bg-white rounded-lg p-3 border border-border">
+        <div className="bg-card rounded-lg p-3 border border-border">
           <div className="flex items-center gap-2 text-text-secondary mb-1">
             <Clock className="w-4 h-4" />
             <span className="text-xs">Ungelesen</span>
@@ -130,7 +130,7 @@ export const WeeklyBriefing = ({ emails }: WeeklyBriefingProps) => {
           <p className="text-2xl font-bold text-orange-600">{briefing.unread}</p>
         </div>
 
-        <div className="bg-white rounded-lg p-3 border border-border">
+        <div className="bg-card rounded-lg p-3 border border-border">
           <div className="flex items-center gap-2 text-text-secondary mb-1">
             <Users className="w-4 h-4" />
             <span className="text-xs">Kategorisiert</span>
@@ -142,7 +142,7 @@ export const WeeklyBriefing = ({ emails }: WeeklyBriefingProps) => {
       {/* Top Senders & Categories */}
       <div className="grid md:grid-cols-2 gap-4">
         {/* Top Absender */}
-        <div className="bg-white rounded-lg p-4 border border-border">
+        <div className="bg-card rounded-lg p-4 border border-border">
           <h3 className="text-sm font-medium text-text-secondary mb-3">Top Absender</h3>
           <div className="space-y-2">
             {briefing.topSenders.length > 0 ? (
@@ -163,7 +163,7 @@ export const WeeklyBriefing = ({ emails }: WeeklyBriefingProps) => {
         </div>
 
         {/* Top Kategorien */}
-        <div className="bg-white rounded-lg p-4 border border-border">
+        <div className="bg-card rounded-lg p-4 border border-border">
           <h3 className="text-sm font-medium text-text-secondary mb-3">Top Kategorien</h3>
           <div className="space-y-2">
             {briefing.topCategories.length > 0 ? (

@@ -2,12 +2,38 @@
 // Wraps Azure OpenAI calls for the Express server
 
 import { Router } from 'express';
-import OpenAI from 'openai';
+import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { classifySchema, classifyBatchSchema, extractActionsSchema, generateReplySchema, suggestFolderSchema } from '../schemas/ai.schema';
+import { getOpenAIClient, getModel, getProvider, isAIConfigured, wrapSystemPrompt } from '../services/openaiClient';
+import { isOboConfigured } from '../services/authService';
+import { suggestRuleFromEmail } from '../services/ruleSuggestionService';
+import { query } from '../db';
 import { logger } from '../services/logger';
 
 const router = Router();
+
+// GET /api/ai-info — surface which AI provider + model the backend currently
+// uses, so the frontend can render a small badge and the user can verify
+// at a glance whether Ollama or Azure OpenAI is serving requests.
+router.get('/ai-info', (_req, res) => {
+  if (!isAIConfigured()) {
+    return res.json({
+      provider: 'unconfigured',
+      model: null,
+      configured: false,
+      copilotObo: isOboConfigured(),
+    });
+  }
+  // Trigger lazy client init so getProvider() is populated on first call.
+  try { getOpenAIClient(); } catch { /* isAIConfigured was true so this shouldn't throw */ }
+  res.json({
+    provider: getProvider(),  // 'azure' | 'ollama' | 'openai' | 'custom'
+    model: getModel(),
+    configured: true,
+    copilotObo: isOboConfigured(),
+  });
+});
 
 // Types
 interface CategoryDefinition {
@@ -43,27 +69,6 @@ const DEFAULT_CATEGORIES: CategoryDefinition[] = [
   { name: 'Intern', description: 'Interne Kommunikation, Team-Updates' },
 ];
 
-// Get OpenAI client (supports both Azure OpenAI and OpenAI)
-function getOpenAIClient(): OpenAI {
-  // Check for Azure OpenAI first
-  if (process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_API_KEY) {
-    return new OpenAI({
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini'}`,
-      defaultQuery: { 'api-version': '2024-08-01-preview' },
-      defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_API_KEY },
-    });
-  }
-
-  // Fall back to regular OpenAI
-  if (process.env.OPENAI_API_KEY) {
-    return new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-
-  throw new Error('No OpenAI configuration found. Set OPENAI_API_KEY or AZURE_OPENAI_* variables.');
-}
 
 // Build system prompt for batch classification
 function buildBatchSystemPrompt(categories: CategoryDefinition[]): string {
@@ -183,7 +188,7 @@ router.post('/classify', validate(classifySchema), async (req, res, next) => {
     const { subject, body, sender, context, categories } = req.body;
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const cats = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES;
     const systemPrompt = buildClassifySystemPrompt(cats);
@@ -206,11 +211,11 @@ router.post('/classify', validate(classifySchema), async (req, res, next) => {
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.2,
-      max_tokens: 500,
+      max_tokens: 150,
       response_format: { type: 'json_object' },
     });
 
@@ -234,7 +239,7 @@ router.post('/classify-batch', validate(classifyBatchSchema), async (req, res, n
     const startTime = Date.now();
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const cats = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES;
     const systemPrompt = buildBatchSystemPrompt(cats);
@@ -249,11 +254,11 @@ router.post('/classify-batch', validate(classifyBatchSchema), async (req, res, n
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.2,
-      max_tokens: 4000,
+      max_tokens: 2000,
       response_format: { type: 'json_object' },
     });
 
@@ -296,7 +301,7 @@ router.post('/extract-actions', validate(extractActionsSchema), async (req, res,
     const { subject, body, sender } = req.body;
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const systemPrompt = `# Aufgaben-Extraktion aus E-Mail
 
@@ -322,11 +327,11 @@ Wenn keine Aktionen erkennbar sind, gib ein leeres Array zurück.`;
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.3,
-      max_tokens: 1000,
+      max_tokens: 400,
       response_format: { type: 'json_object' },
     });
 
@@ -349,7 +354,7 @@ router.post('/generate-reply', validate(generateReplySchema), async (req, res, n
     const { subject, body, sender, replyType, userName, additionalContext } = req.body;
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const replyStyles: Record<string, string> = {
       accept: 'Zustimmend, positiv',
@@ -390,11 +395,11 @@ Schreibe eine professionelle Antwort auf die E-Mail.
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.7,
-      max_tokens: 1500,
+      max_tokens: 800,
       response_format: { type: 'json_object' },
     });
 
@@ -417,7 +422,7 @@ router.post('/suggest-folder', validate(suggestFolderSchema), async (req, res, n
     const { subject, body, sender, folders } = req.body;
 
     const client = getOpenAIClient();
-    const model = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const model = getModel();
 
     const folderList = folders.map((f: any) => `- ${f.displayName || f.name}`).join('\n');
 
@@ -440,11 +445,11 @@ ${folderList}
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: wrapSystemPrompt(systemPrompt) },
         { role: 'user', content: userMessage },
       ],
       temperature: 0.2,
-      max_tokens: 200,
+      max_tokens: 100,
       response_format: { type: 'json_object' },
     });
 
@@ -457,6 +462,55 @@ ${folderList}
     res.json(result);
   } catch (error) {
     logger.error('Suggest folder error', { error: (error as Error).message, tenantId: req.tenantId });
+    next(error);
+  }
+});
+
+// POST /api/suggest-rule-from-email — given a representative email, propose
+// toggleable criteria and actions for a new automation rule. The frontend
+// shows the result in a modal so the user can pick what to keep.
+const suggestRuleSchema = z.object({
+  subject: z.string().max(2000).optional().default(''),
+  // The frontend strips HTML + truncates before sending, but allow generous
+  // headroom for edge cases (large newsletters, raw bodies from tests).
+  body: z.string().max(100_000).optional().default(''),
+  sender: z.string().max(500).optional().default(''),
+  hasAttachments: z.boolean().optional().default(false),
+  importance: z.enum(['high', 'normal', 'low']).optional(),
+}).refine(d => (d.subject || d.body || d.sender), {
+  message: 'At least one of subject / body / sender is required',
+});
+
+router.post('/suggest-rule-from-email', validate(suggestRuleSchema), async (req, res, next) => {
+  try {
+    // Load tenant category names so the LLM suggests a valid categorize value.
+    const cats = await query<{ name: string }>(
+      'SELECT name FROM categories WHERE tenant_id = $1 ORDER BY sort_order, name',
+      [req.tenantId]
+    );
+    const availableCategories = cats.map(c => c.name);
+
+    const body = req.body as z.infer<typeof suggestRuleSchema>;
+    const result = await suggestRuleFromEmail({
+      subject: body.subject,
+      body: body.body,
+      sender: body.sender,
+      hasAttachments: body.hasAttachments,
+      importance: body.importance,
+      availableCategories,
+    });
+
+    res.json({
+      suggestion: result.suggestion,
+      model: result.model,
+      tokens: result.usage,
+      processingTimeMs: result.processingTimeMs,
+    });
+  } catch (error) {
+    logger.error('Suggest rule error', {
+      error: (error as Error).message,
+      tenantId: req.tenantId,
+    });
     next(error);
   }
 });

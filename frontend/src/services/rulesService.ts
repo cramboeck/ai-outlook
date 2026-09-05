@@ -43,10 +43,23 @@ export interface RuleCriteria {
 }
 
 export interface RuleAction {
-  type: 'move' | 'categorize' | 'markRead' | 'markUnread' | 'flag' | 'unflag' | 'delete';
+  type:
+    | 'move'
+    | 'categorize'
+    | 'markRead'
+    | 'markUnread'
+    | 'flag'
+    | 'unflag'
+    | 'delete'
+    | 'extractActions'
+    | 'forwardToDms';
   targetFolderId?: string;
   targetFolderName?: string; // For display purposes
   targetCategory?: string;
+  /** For forwardToDms: resolved integration id (uuid). */
+  integrationId?: string;
+  /** Display-only name of the integration, populated when picked in the UI. */
+  integrationName?: string;
 }
 
 interface RulesStorage {
