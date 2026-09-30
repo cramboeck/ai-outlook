@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Mail, Settings, X, ScrollText, PlugZap, ClipboardList, FileText } from 'lucide-react';
+import { LayoutDashboard, Mail, Settings, X, ScrollText, PlugZap, ClipboardList, FileText, Inbox } from 'lucide-react';
 import { AiProviderBadge } from './AiProviderBadge';
 
 interface SidebarProps {
@@ -9,6 +9,7 @@ interface SidebarProps {
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/inbox-overview', icon: Inbox, label: 'Uebersicht' },
   { to: '/mail', icon: Mail, label: 'E-Mail' },
   { to: '/actions', icon: ClipboardList, label: 'Aufgaben' },
   { to: '/documents', icon: FileText, label: 'Dokumente' },
