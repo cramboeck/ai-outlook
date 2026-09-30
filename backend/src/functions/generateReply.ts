@@ -112,7 +112,7 @@ Erstelle eine passende Antwort.`;
         { role: 'user', content: userMessage },
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 800,
       response_format: { type: 'json_object' },
     });
 

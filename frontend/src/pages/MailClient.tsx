@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, RefreshCw, Clock, Search } from 'lucide-react';
+import { Sparkles, RefreshCw, Clock, Search, FileText, CheckCircle2, AlertTriangle, Receipt, ShoppingCart, FileSignature, ScanSearch } from 'lucide-react';
+import { api } from '../services/apiClient';
 import { FolderSidebar } from '../components/mail/FolderSidebar';
 import { ComposeModal } from '../components/mail/ComposeModal';
 import { EmailDetail } from '../components/mail/EmailDetail';
@@ -11,6 +12,10 @@ import { ClassificationResult } from '../components/classification/Classificatio
 import { BatchClassifyModal } from '../components/classification/BatchClassifyModal';
 import { ReplyModal } from '../components/email/ReplyModal';
 import { SearchModal } from '../components/mail/SearchModal';
+import { SmartRuleFromEmailModal } from '../components/SmartRuleFromEmailModal';
+import { ShortcutHelpOverlay } from '../components/ShortcutHelpOverlay';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import type { Shortcut } from '../hooks/useKeyboardShortcuts';
 import { useClassify } from '../hooks/useClassify';
 import {
   getEmailsFromFolder,
@@ -41,6 +46,15 @@ export const MailClient = () => {
   const [replyEmail, setReplyEmail] = useState<Email | null>(null);
   const [classificationResult, setClassificationResult] = useState<Classification | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any | null>(null);
+
+  // Smart-Rule-from-Email modal
+  const [ruleSuggestEmail, setRuleSuggestEmail] = useState<Email | null>(null);
+  const [ruleCreatedMsg, setRuleCreatedMsg] = useState<string | null>(null);
+
+  // Shortcut help overlay
+  const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
 
   const account = accounts[0];
   const userName = account?.name || 'Freundliche Grüße';
@@ -115,7 +129,37 @@ export const MailClient = () => {
 
   const handleDismiss = () => {
     setClassificationResult(null);
+    setAnalysisResult(null);
     setSelectedEmail(null);
+  };
+
+  // Full pipeline analysis: classification + action extraction + document detection
+  const handleAnalyzeEmail = async (email: Email) => {
+    setSelectedEmail(email);
+    setClassificationResult(null);
+    setAnalysisResult(null);
+    setIsAnalyzing(true);
+
+    try {
+      const fullEmail = await getEmailBody(email.id);
+      const result = await api.post('/process-email', {
+        email: {
+          id: fullEmail.id,
+          subject: fullEmail.subject,
+          body: fullEmail.body?.content || fullEmail.bodyPreview || '',
+          sender: fullEmail.from?.emailAddress?.address || '',
+          senderEmail: fullEmail.from?.emailAddress?.address || '',
+          hasAttachments: fullEmail.hasAttachments || false,
+          importance: fullEmail.importance || 'normal',
+        },
+      });
+      setAnalysisResult(result);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      setAnalysisResult({ error: (error as Error).message });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleBatchClassify = async (emailsToClassify: Email[]) => {
@@ -158,6 +202,32 @@ export const MailClient = () => {
 
   const isFollowUp = selectedFolderId === 'followup';
 
+  // List navigation helpers used by keyboard shortcuts
+  const selectByOffset = (offset: number) => {
+    if (emails.length === 0) return;
+    const currentIdx = selectedEmail
+      ? emails.findIndex((e) => e.id === selectedEmail.id)
+      : -1;
+    const nextIdx = currentIdx < 0
+      ? (offset > 0 ? 0 : emails.length - 1)
+      : Math.min(emails.length - 1, Math.max(0, currentIdx + offset));
+    setSelectedEmail(emails[nextIdx]);
+  };
+
+  const shortcuts: Shortcut[] = [
+    { group: 'Navigation', keys: ['ArrowDown', 'j'], description: 'Nächste E-Mail', action: () => selectByOffset(1) },
+    { group: 'Navigation', keys: ['ArrowUp', 'k'], description: 'Vorige E-Mail', action: () => selectByOffset(-1) },
+    { group: 'Navigation', keys: 'Escape', description: 'Auswahl schließen', allowInInput: false, action: () => setSelectedEmail(null) },
+    { group: 'Aktionen', keys: 'c', description: 'Klassifizieren', action: () => selectedEmail && handleClassifyEmail(selectedEmail) },
+    { group: 'Aktionen', keys: 'r', description: 'Antworten (KI)', action: () => selectedEmail && handleReplyClick(selectedEmail) },
+    { group: 'Aktionen', keys: 'a', description: 'Vollständige KI-Analyse', action: () => selectedEmail && handleAnalyzeEmail(selectedEmail) },
+    { group: 'Ansicht', keys: '/', description: 'Suche öffnen', action: () => setIsSearchModalOpen(true) },
+    { group: 'Ansicht', keys: 'n', description: 'Neue E-Mail', action: () => setIsComposeOpen(true) },
+    { group: 'Hilfe', keys: '?', shift: true, allowInInput: false, description: 'Shortcut-Hilfe', action: () => setIsShortcutHelpOpen(v => !v) },
+  ];
+
+  useKeyboardShortcuts(shortcuts, !ruleSuggestEmail && !isReplyModalOpen && !isBatchModalOpen && !isComposeOpen);
+
   return (
     <div className="flex h-[calc(100vh-4rem)] -m-6">
       {/* Folder Sidebar */}
@@ -171,7 +241,7 @@ export const MailClient = () => {
       {/* Main Content - Email List */}
       <div className={`flex-1 flex flex-col overflow-hidden bg-gray-50 ${selectedEmail ? 'hidden md:flex md:w-2/5 lg:w-1/2' : ''}`}>
         {/* Header */}
-        <div className="bg-white border-b border-border px-4 py-3">
+        <div className="bg-card border-b border-border px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {isFollowUp && <Clock className="w-5 h-5 text-orange-500" />}
@@ -218,7 +288,7 @@ export const MailClient = () => {
 
         {/* Classification Result */}
         {classificationResult && selectedEmail && (
-          <div className="bg-white border-b border-border px-4 py-3">
+          <div className="bg-card border-b border-border px-4 py-3">
             <p className="text-sm text-text-secondary mb-2">
               Ergebnis für: <strong>{selectedEmail.subject}</strong>
             </p>
@@ -231,9 +301,122 @@ export const MailClient = () => {
           </div>
         )}
 
+        {/* Analysis Result (full pipeline) */}
+        {analysisResult && selectedEmail && !analysisResult.error && (
+          <div className="bg-card border-b border-border px-4 py-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-text flex items-center gap-2">
+                <ScanSearch className="w-4 h-4 text-emerald-500" />
+                Analyse-Ergebnis
+              </p>
+              <button
+                onClick={() => setAnalysisResult(null)}
+                className="text-xs text-text-secondary hover:text-text"
+              >
+                Schliessen
+              </button>
+            </div>
+
+            {/* Classification */}
+            {analysisResult.classification && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-text-secondary">Kategorie:</span>
+                <span className="px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded-full">
+                  {analysisResult.classification.category}
+                </span>
+                <span className="text-xs text-text-secondary">
+                  ({Math.round((analysisResult.classification.confidence || 0) * 100)}%)
+                </span>
+              </div>
+            )}
+
+            {/* Extracted Actions */}
+            {analysisResult.actions?.length > 0 && (
+              <div>
+                <p className="text-xs text-text-secondary mb-1">Erkannte Aufgaben:</p>
+                <div className="space-y-1">
+                  {analysisResult.actions.map((action: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <span className="text-text">{action.description}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        action.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                        action.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                      }`}>
+                        {action.priority}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Detected Document */}
+            {analysisResult.document && (
+              <div className="flex items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                {analysisResult.document.type === 'invoice' && <Receipt className="w-4 h-4 text-purple-500" />}
+                {analysisResult.document.type === 'order' && <ShoppingCart className="w-4 h-4 text-blue-500" />}
+                {analysisResult.document.type === 'contract' && <FileSignature className="w-4 h-4 text-amber-500" />}
+                {analysisResult.document.type === 'receipt' && <FileText className="w-4 h-4 text-green-500" />}
+                <div className="text-sm">
+                  <span className="font-medium text-text">
+                    {analysisResult.document.type === 'invoice' ? 'Rechnung' :
+                     analysisResult.document.type === 'order' ? 'Bestellung' :
+                     analysisResult.document.type === 'contract' ? 'Vertrag' :
+                     'Quittung'}
+                  </span>
+                  {analysisResult.document.extractedData?.vendor && (
+                    <span className="text-text-secondary"> von {analysisResult.document.extractedData.vendor}</span>
+                  )}
+                  {analysisResult.document.extractedData?.amount && (
+                    <span className="text-text-secondary"> - {analysisResult.document.extractedData.amount} {analysisResult.document.extractedData.currency || 'EUR'}</span>
+                  )}
+                </div>
+                <span className="ml-auto text-xs text-emerald-600 dark:text-emerald-400">Auf Dokumente-Seite gespeichert</span>
+              </div>
+            )}
+
+            {/* No findings */}
+            {!analysisResult.actions?.length && !analysisResult.document && analysisResult.classification && (
+              <p className="text-xs text-text-secondary">Keine Aufgaben oder Dokumente erkannt.</p>
+            )}
+
+            {/* Token usage */}
+            {analysisResult.tokenUsage?.total > 0 && (
+              <p className="text-xs text-text-secondary">
+                {analysisResult.tokenUsage.total} Tokens verwendet
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Analysis error */}
+        {analysisResult?.error && (
+          <div className="bg-card border-b border-border px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+              <AlertTriangle className="w-4 h-4" />
+              <span>Analyse fehlgeschlagen: {analysisResult.error}</span>
+              <button onClick={() => setAnalysisResult(null)} className="ml-auto text-xs underline">Schliessen</button>
+            </div>
+          </div>
+        )}
+
+        {/* Currently analyzing indicator */}
+        {isAnalyzing && selectedEmail && (
+          <div className="bg-card border-b border-border px-4 py-3">
+            <div className="flex items-center gap-3">
+              <ScanSearch className="w-5 h-5 text-emerald-500 animate-pulse" />
+              <span className="text-text-secondary text-sm">
+                Analysiere E-Mail (Klassifizierung + Aufgaben + Dokumente)...
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Currently classifying indicator */}
         {isClassifying && selectedEmail && !classificationResult && (
-          <div className="bg-white border-b border-border px-4 py-3">
+          <div className="bg-card border-b border-border px-4 py-3">
             <div className="flex items-center gap-3">
               <ClassifyButton onClick={() => {}} isLoading={true} disabled />
               <span className="text-text-secondary text-sm">
@@ -265,6 +448,9 @@ export const MailClient = () => {
             onClose={() => setSelectedEmail(null)}
             onReply={handleReplyClick}
             onClassify={!isSentFolder && !isFollowUp ? handleClassifyEmail : undefined}
+            onAnalyze={!isSentFolder && !isFollowUp ? handleAnalyzeEmail : undefined}
+            onSuggestRule={!isSentFolder ? (email) => setRuleSuggestEmail(email) : undefined}
+            isAnalyzing={isAnalyzing}
             onDelete={() => refetch()}
             onMoved={() => {
               refetch();
@@ -311,6 +497,39 @@ export const MailClient = () => {
         onClose={() => setIsSearchModalOpen(false)}
         onMoved={() => refetch()}
       />
+
+      {/* Smart Rule Suggest Modal */}
+      <SmartRuleFromEmailModal
+        isOpen={!!ruleSuggestEmail}
+        email={ruleSuggestEmail}
+        onClose={() => setRuleSuggestEmail(null)}
+        onCreated={(name) => {
+          setRuleCreatedMsg(`Regel "${name}" wurde angelegt.`);
+          setTimeout(() => setRuleCreatedMsg(null), 4000);
+        }}
+      />
+
+      {ruleCreatedMsg && (
+        <div className="fixed bottom-6 right-6 z-[60] px-4 py-3 rounded-lg bg-emerald-600 text-white text-sm shadow-lg">
+          {ruleCreatedMsg}
+        </div>
+      )}
+
+      {/* Keyboard Shortcut Help Overlay (? to open) */}
+      <ShortcutHelpOverlay
+        isOpen={isShortcutHelpOpen}
+        shortcuts={shortcuts}
+        onClose={() => setIsShortcutHelpOpen(false)}
+      />
+
+      {/* Subtle hint badge in corner so users discover ?  */}
+      <button
+        onClick={() => setIsShortcutHelpOpen(true)}
+        className="fixed bottom-4 right-4 z-40 text-xs text-text-secondary bg-white/80 backdrop-blur border border-border rounded-md px-2 py-1 hover:bg-white hover:text-text transition-colors shadow-sm"
+        title="Tastatur-Shortcuts anzeigen"
+      >
+        Shortcuts <kbd className="font-mono ml-1 px-1 rounded bg-gray-100 border border-gray-300">?</kbd>
+      </button>
     </div>
   );
 };

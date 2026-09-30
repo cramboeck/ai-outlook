@@ -34,3 +34,11 @@ obj/
 
 # Vite
 *.local
+
+# Local Claude Code config
+.claude/
+
+# Local SQLite dev database
+backend/data/
+.env.prod
+deploy/backups/

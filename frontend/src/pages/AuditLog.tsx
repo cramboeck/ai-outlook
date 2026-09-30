@@ -243,9 +243,34 @@ export function AuditLog() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="p-8 text-center text-text-secondary">Laden...</td></tr>
+                <>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border">
+                      <td className="p-3"><div className="animate-pulse h-4 w-28 bg-gray-200 rounded" /></td>
+                      <td className="p-3"><div className="animate-pulse h-5 w-20 bg-gray-200 rounded-full" /></td>
+                      <td className="p-3"><div className="animate-pulse h-4 w-40 bg-gray-200 rounded" /></td>
+                      <td className="p-3"><div className="animate-pulse h-4 w-32 bg-gray-200 rounded" /></td>
+                      <td className="p-3"><div className="animate-pulse h-4 w-24 bg-gray-200 rounded" /></td>
+                      <td className="p-3"><div className="animate-pulse h-5 w-16 bg-gray-200 rounded-full" /></td>
+                      <td className="p-3"><div className="animate-pulse h-4 w-8 bg-gray-200 rounded" /></td>
+                    </tr>
+                  ))}
+                </>
               ) : logs.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-text-secondary">Keine Eintraege gefunden</td></tr>
+                <tr>
+                  <td colSpan={7} className="p-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center">
+                        <span className="text-3xl">📝</span>
+                      </div>
+                      <h3 className="font-semibold text-text">Noch keine Aktivitaeten</h3>
+                      <p className="text-text-secondary text-sm max-w-sm">
+                        Sobald E-Mails verarbeitet oder Dokumente weitergeleitet werden,
+                        erscheint hier das vollstaendige Protokoll.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
               ) : logs.map(log => (
                 <tr key={log.id} className="border-b border-border hover:bg-bg transition-colors">
                   <td className="p-3 text-text-secondary whitespace-nowrap">{formatDate(log.created_at)}</td>

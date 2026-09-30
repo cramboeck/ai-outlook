@@ -68,3 +68,17 @@ export const graphScopes = {
     'https://graph.microsoft.com/MailboxSettings.ReadWrite',
   ],
 };
+
+// Separate scopes for To-Do sync - requested only when needed
+export const todoScopes = {
+  scopes: [
+    'https://graph.microsoft.com/Tasks.ReadWrite',
+  ],
+};
+
+// Separate scopes for SharePoint - requested only when needed
+export const sharepointScopes = {
+  scopes: [
+    'https://graph.microsoft.com/Sites.ReadWrite.All',
+  ],
+};

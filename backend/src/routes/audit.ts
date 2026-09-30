@@ -67,6 +67,90 @@ router.get('/log', async (req, res, next) => {
   }
 });
 
+// POST /api/audit/status-batch - Aggregated workflow status per email id.
+// Returns a compact map the EmailList uses to render indicator badges
+// (classified / open action / forwarded / rule-matched). Capped to 100
+// ids per call so it fits comfortably into a single round trip.
+router.post('/status-batch', async (req, res, next) => {
+  try {
+    const raw = req.body?.email_ids;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return res.json({ statuses: {} });
+    }
+    const ids = raw
+      .filter((x: unknown) => typeof x === 'string' && x.length > 0)
+      .slice(0, 100);
+
+    // Seed result with all ids defaulted to "nothing tracked yet".
+    const statuses: Record<string, {
+      classified: boolean;
+      hasAction: boolean;
+      forwarded: boolean;
+      ruleMatched: boolean;
+      category?: string;
+      urgency?: string;
+    }> = {};
+    for (const id of ids) {
+      statuses[id] = {
+        classified: false,
+        hasAction: false,
+        forwarded: false,
+        ruleMatched: false,
+      };
+    }
+
+    // 1. Classifications + rule matches from processing_log (one round trip).
+    const logs = await query<{
+      email_id: string;
+      event_type: string;
+      category: string | null;
+    }>(
+      `SELECT email_id, event_type, category FROM processing_log
+       WHERE tenant_id = $1 AND email_id = ANY($2::text[])
+         AND event_type IN ('classification', 'rule_match')`,
+      [req.tenantId, ids]
+    );
+    for (const log of logs) {
+      const s = statuses[log.email_id];
+      if (!s) continue;
+      if (log.event_type === 'classification') {
+        s.classified = true;
+        if (log.category) s.category = log.category;
+      }
+      if (log.event_type === 'rule_match') {
+        s.ruleMatched = true;
+      }
+    }
+
+    // 2. Actions — any row means there was at least an AI-extracted follow-up.
+    //    status in (open, in_progress) → hasAction.
+    //    forwarded_to non-empty → forwarded.
+    const actions = await query<{
+      email_id: string;
+      status: string;
+      forwarded_to: unknown;
+      priority: string | null;
+    }>(
+      `SELECT email_id, status, forwarded_to, priority FROM actions
+       WHERE tenant_id = $1 AND email_id = ANY($2::text[])`,
+      [req.tenantId, ids]
+    );
+    for (const a of actions) {
+      const s = statuses[a.email_id];
+      if (!s) continue;
+      if (a.status === 'open' || a.status === 'in_progress') s.hasAction = true;
+      const ft = typeof a.forwarded_to === 'string' ? JSON.parse(a.forwarded_to) : a.forwarded_to;
+      if (Array.isArray(ft) && ft.length > 0) s.forwarded = true;
+      if (a.priority && !s.urgency) s.urgency = a.priority;
+    }
+
+    res.json({ statuses });
+  } catch (error) {
+    logger.error('Status-batch query error', { error: (error as Error).message });
+    next(error);
+  }
+});
+
 // GET /api/audit/email/:emailId - Complete history of a single email
 router.get('/email/:emailId', async (req, res, next) => {
   try {

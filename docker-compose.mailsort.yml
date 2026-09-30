@@ -1,0 +1,135 @@
+# MailSort Production Stack — für srv-docker01
+#
+# Läuft neben ramboflow + bookstack auf demselben Host. Kein neuer
+# Reverse-Proxy: MailSort hängt sich in das existierende
+# `timetracking_app_ramboflow-network` ein und lässt sich vom
+# ramboflow-nginx auf mailsort-frontend:80 / mailsort-backend:7071
+# proxyen. Keine Ports auf den Host — reine Container-zu-Container-
+# Kommunikation über Docker-DNS.
+#
+# Erst-Deployment:
+#   1. .env.prod.example → .env.prod, Werte ausfüllen
+#   2. docker compose -f docker-compose.mailsort.yml --env-file .env.prod up -d --build
+#   3. Migrationen: docker compose ... exec backend npx tsx src/db/migrate.ts
+#   4. vhost-Snippet aus deploy/nginx-mailsort.conf in
+#      /home/timetracking_app/timetracking_app/nginx/nginx.production.conf einfügen
+#   5. Cert holen: siehe deploy/README.md → "Zertifikat für neue Subdomain"
+#   6. docker exec ramboflow-nginx nginx -s reload
+
+name: mailsort
+
+networks:
+  # Privates MailSort-Netz für DB + Backup-Sidecar.
+  mailsort-net:
+    name: mailsort-net
+    driver: bridge
+
+  # Existierendes Netz vom ramboflow-Stack — hier hängt sich der Reverse
+  # Proxy dran. Wir joinen es als external, um von dort proxied zu werden.
+  ramboflow-network:
+    name: timetracking_app_ramboflow-network
+    external: true
+
+volumes:
+  postgres-data:
+    name: mailsort-postgres-data
+  postgres-backups:
+    name: mailsort-postgres-backups
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mailsort-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      # Nur im internen Netz — kein Zugriff vom Reverse-Proxy oder Host.
+      - mailsort-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: mailsort-backend:latest
+    container_name: mailsort-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 7071
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_SSL: "false"
+      SKIP_AUTH: "false"
+      CORS_ORIGIN: ${PUBLIC_URL}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+    networks:
+      - mailsort-net          # → postgres
+      - ramboflow-network     # → ramboflow-nginx findet mich als "mailsort-backend"
+    # Keine ports! Zugriff erfolgt ausschließlich über ramboflow-nginx.
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${PUBLIC_URL}/api
+        VITE_MSAL_CLIENT_ID: ${AZURE_CLIENT_ID}
+        VITE_MSAL_TENANT_ID: ${AZURE_TENANT_ID}
+    image: mailsort-frontend:latest
+    container_name: mailsort-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - ramboflow-network     # → ramboflow-nginx findet mich als "mailsort-frontend"
+
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: mailsort-postgres-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - postgres-backups:/backups
+      - ./deploy/backup.sh:/usr/local/bin/backup.sh:ro
+    networks:
+      - mailsort-net
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "chmod +x /usr/local/bin/backup.sh &&
+       while true; do
+         sleep $$(( $$(date -d 'tomorrow 02:15' +%s) - $$(date +%s) ));
+         /usr/local/bin/backup.sh || echo 'Backup failed';
+       done"

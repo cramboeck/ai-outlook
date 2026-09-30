@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-/* PostPilot by Ramböck IT - Custom Theme */
+html {
+  scroll-behavior: smooth;
+}
+
+/* MailSort by Ramböck IT - Custom Theme */
 @theme {
   /* Ramböck Corporate Colors */
   --color-primary: #E87722;

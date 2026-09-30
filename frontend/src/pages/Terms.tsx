@@ -18,7 +18,7 @@ export const Terms = () => {
             <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary-dark rounded-lg flex items-center justify-center">
               <Mail className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-text">PostPilot</span>
+            <span className="font-bold text-text">MailSort</span>
           </div>
         </div>
       </header>
@@ -44,15 +44,15 @@ export const Terms = () => {
               </h2>
               <p className="text-text-secondary">
                 Diese Allgemeinen Geschäftsbedingungen (AGB) gelten für die Nutzung des Dienstes
-                "PostPilot", bereitgestellt von Ramböck IT. Mit der Registrierung oder Nutzung
-                von PostPilot akzeptieren Sie diese Bedingungen.
+                "MailSort", bereitgestellt von Ramböck IT. Mit der Registrierung oder Nutzung
+                von MailSort akzeptieren Sie diese Bedingungen.
               </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-xl font-semibold text-text mb-4">2. Leistungsbeschreibung</h2>
               <p className="text-text-secondary mb-4">
-                PostPilot ist ein KI-gestützter E-Mail-Assistent für Microsoft 365, der folgende
+                MailSort ist ein KI-gestützter E-Mail-Assistent für Microsoft 365, der folgende
                 Funktionen bietet:
               </p>
               <ul className="list-disc list-inside text-text-secondary space-y-2 ml-4">
@@ -66,12 +66,12 @@ export const Terms = () => {
             <section className="mb-8">
               <h2 className="text-xl font-semibold text-text mb-4">3. Registrierung und Konto</h2>
               <p className="text-text-secondary mb-4">
-                Die Nutzung von PostPilot erfordert ein Microsoft 365-Konto. Bei der Registrierung:
+                Die Nutzung von MailSort erfordert ein Microsoft 365-Konto. Bei der Registrierung:
               </p>
               <ul className="list-disc list-inside text-text-secondary space-y-2 ml-4">
                 <li>Müssen Sie wahrheitsgemäße Angaben machen</li>
                 <li>Sind Sie für die Sicherheit Ihrer Zugangsdaten verantwortlich</li>
-                <li>Erteilen Sie PostPilot die erforderlichen Berechtigungen über Microsoft OAuth</li>
+                <li>Erteilen Sie MailSort die erforderlichen Berechtigungen über Microsoft OAuth</li>
               </ul>
             </section>
 
@@ -129,7 +129,7 @@ export const Terms = () => {
               <h2 className="text-xl font-semibold text-text mb-4">7. Haftungsausschluss</h2>
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4">
                 <p className="text-text-secondary text-sm">
-                  PostPilot ist ein KI-gestützter Dienst. KI-generierte Inhalte (Kategorisierungen,
+                  MailSort ist ein KI-gestützter Dienst. KI-generierte Inhalte (Kategorisierungen,
                   Antwortvorschläge) sind Empfehlungen und sollten vor dem Versenden überprüft werden.
                   Ramböck IT übernimmt keine Haftung für Schäden durch KI-generierte Inhalte.
                 </p>

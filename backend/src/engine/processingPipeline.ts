@@ -11,6 +11,10 @@ export interface ProcessingOptions {
   forceAI?: boolean;
   autoApplyThreshold?: number;
   skipActionExtraction?: boolean;
+  /** Raw user JWT without the 'Bearer ' prefix. Required for Copilot draft generation. */
+  userAccessToken?: string;
+  /** Set true when the tenant has the Copilot premium flag enabled. */
+  hasCopilotLicense?: boolean;
 }
 
 export interface ClassificationResult {
@@ -47,6 +51,26 @@ export interface DocumentInfo {
   suggestedActions: string[];
 }
 
+export interface CopilotDraftCitation {
+  index: number;
+  title: string;
+  url: string | null;
+  source: 'teams' | 'sharepoint' | 'onedrive' | 'email' | 'other';
+  snippet: string;
+}
+
+export interface CopilotDraft {
+  draftText: string;
+  citations: CopilotDraftCitation[];
+  model: string;
+  retrievalHitCount: number;
+  processingTimeMs: number;
+  /** When the premium feature was available but the call failed / was skipped. */
+  skipped?: {
+    reason: 'obo_not_configured' | 'consent_required' | 'no_copilot_license' | 'retrieval_failed' | 'synthesis_failed' | 'not_actionable';
+  };
+}
+
 export interface ProcessingResult {
   emailId: string;
 
@@ -67,6 +91,10 @@ export interface ProcessingResult {
 
   // Document detection
   document: DocumentInfo | null;
+
+  // Context-Aware Copilot draft (premium — only populated when tenant has license
+  // and classification signals isActionRequired)
+  copilotDraft: CopilotDraft | null;
 
   // Executable actions from rules
   pendingActions: Array<{
@@ -117,6 +145,21 @@ export interface AIDocumentDetector {
   }>;
 }
 
+export interface AICopilotDraftGenerator {
+  /**
+   * Generate a context-aware draft. Returns null when the request was skipped
+   * (missing token, unavailable feature). Never throws — the implementation
+   * maps expected failures to a { skipped: { reason } } marker.
+   */
+  generate(
+    email: EmailForProcessing,
+    userAccessToken: string
+  ): Promise<{
+    draft: CopilotDraft | null;
+    usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  }>;
+}
+
 /**
  * Process a single email through the full pipeline.
  */
@@ -129,6 +172,7 @@ export async function processEmail(
     classifier?: AIClassifier;
     actionExtractor?: AIActionExtractor;
     documentDetector?: AIDocumentDetector;
+    copilotDraftGenerator?: AICopilotDraftGenerator;
   } = {}
 ): Promise<ProcessingResult> {
   const startTime = Date.now();
@@ -141,6 +185,7 @@ export async function processEmail(
     ruleMatches: [],
     actions: [],
     document: null,
+    copilotDraft: null,
     pendingActions: [],
     autoApply: false,
     dryRun,
@@ -258,6 +303,58 @@ export async function processEmail(
           source: 'ai',
           model: actionResult.model,
           metadata: { action },
+        });
+      }
+    }
+
+    // Step 3.5: Copilot Context-Aware Draft (premium)
+    // Runs when: tenant has Copilot license, classification signals action required,
+    // user token is available (OBO requires the raw inbound JWT).
+    const copilotEligible = options.hasCopilotLicense === true
+      && result.classification?.signals?.isActionRequired === true
+      && !!options.userAccessToken
+      && !!services.copilotDraftGenerator
+      && !dryRun;
+
+    if (copilotEligible && services.copilotDraftGenerator && options.userAccessToken) {
+      try {
+        const draftResult = await services.copilotDraftGenerator.generate(
+          email,
+          options.userAccessToken
+        );
+        result.copilotDraft = draftResult.draft;
+
+        result.tokenUsage.prompt += draftResult.usage.prompt_tokens;
+        result.tokenUsage.completion += draftResult.usage.completion_tokens;
+        result.tokenUsage.total += draftResult.usage.total_tokens;
+        const cost = estimateCost(draftResult.usage.prompt_tokens, draftResult.usage.completion_tokens);
+        result.tokenUsage.estimatedCostUsd += cost;
+
+        if (result.copilotDraft && !result.copilotDraft.skipped) {
+          await logEvent({
+            tenantId,
+            userId,
+            emailId: email.id,
+            emailSubject: email.subject,
+            eventType: 'copilot_draft_generated',
+            source: 'ai',
+            model: result.copilotDraft.model,
+            tokensPrompt: draftResult.usage.prompt_tokens,
+            tokensCompletion: draftResult.usage.completion_tokens,
+            tokensTotal: draftResult.usage.total_tokens,
+            estimatedCostUsd: cost,
+            processingTimeMs: result.copilotDraft.processingTimeMs,
+            metadata: {
+              retrievalHitCount: result.copilotDraft.retrievalHitCount,
+              citationCount: result.copilotDraft.citations.length,
+            },
+          });
+        }
+      } catch (err) {
+        // Pipeline must not fail because of Copilot — log and continue.
+        logger.warn('Copilot draft generation threw', {
+          emailId: email.id,
+          error: (err as Error).message.slice(0, 200),
         });
       }
     }

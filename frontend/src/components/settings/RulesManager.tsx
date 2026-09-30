@@ -39,10 +39,16 @@ import {
   type RuleCriteria,
   type RuleAction,
 } from '../../services/rulesService';
+import {
+  fetchServerRules,
+  updateServerRule,
+  deleteServerRule,
+} from '../../services/rulesApiService';
 import { getMailFolders } from '../../services/graphService';
 import { buildFolderHierarchy, type FolderWithPath } from '../../services/folderService';
 import { getActiveCategories } from '../../services/categoryService';
 import type { Category } from '../../types';
+import { ApplyRulesDialog } from '../ApplyRulesDialog';
 
 interface RuleEditModalProps {
   rule: EmailRule | null;
@@ -166,7 +172,7 @@ const RuleEditModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-card rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h3 className="text-lg font-semibold text-text">
@@ -193,7 +199,7 @@ const RuleEditModal = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="z.B. Newsletter kategorisieren"
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-gray-700 text-text"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-bg text-text"
               />
             </div>
             <div>
@@ -205,7 +211,7 @@ const RuleEditModal = ({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optionale Beschreibung"
-                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-gray-700 text-text"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-bg text-text"
               />
             </div>
           </div>
@@ -217,7 +223,7 @@ const RuleEditModal = ({
               <select
                 value={matchMode}
                 onChange={(e) => setMatchMode(e.target.value as 'all' | 'any')}
-                className="text-sm px-2 py-1 border border-border rounded bg-white dark:bg-gray-700 text-text"
+                className="text-sm px-2 py-1 border border-border rounded bg-bg text-text"
               >
                 <option value="all">Alle Bedingungen (UND)</option>
                 <option value="any">Eine Bedingung (ODER)</option>
@@ -234,7 +240,7 @@ const RuleEditModal = ({
                   value={fromContains}
                   onChange={(e) => setFromContains(e.target.value)}
                   placeholder="z.B. newsletter"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 />
               </div>
               <div>
@@ -246,7 +252,7 @@ const RuleEditModal = ({
                   value={fromDomain}
                   onChange={(e) => setFromDomain(e.target.value)}
                   placeholder="z.B. microsoft.com"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 />
               </div>
               <div>
@@ -258,7 +264,7 @@ const RuleEditModal = ({
                   value={subjectContains}
                   onChange={(e) => setSubjectContains(e.target.value)}
                   placeholder="z.B. Rechnung"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 />
               </div>
               <div>
@@ -270,7 +276,7 @@ const RuleEditModal = ({
                   value={bodyContains}
                   onChange={(e) => setBodyContains(e.target.value)}
                   placeholder="z.B. unsubscribe"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 />
               </div>
             </div>
@@ -287,7 +293,7 @@ const RuleEditModal = ({
                       e.target.value === '' ? undefined : e.target.value === 'true'
                     )
                   }
-                  className="px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 >
                   <option value="">Egal</option>
                   <option value="true">Mit Anhängen</option>
@@ -305,7 +311,7 @@ const RuleEditModal = ({
                       (e.target.value as 'high' | 'normal' | 'low') || undefined
                     )
                   }
-                  className="px-3 py-2 border border-border rounded-lg text-sm bg-white dark:bg-gray-700 text-text"
+                  className="px-3 py-2 border border-border rounded-lg text-sm bg-bg text-text"
                 >
                   <option value="">Egal</option>
                   <option value="high">Hoch</option>
@@ -331,7 +337,7 @@ const RuleEditModal = ({
                   return (
                     <div
                       key={index}
-                      className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                      className="flex items-center gap-3 p-3 bg-bg rounded-lg"
                     >
                       <Icon className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium text-text">
@@ -348,7 +354,7 @@ const RuleEditModal = ({
                               targetFolderName: folder?.displayName,
                             });
                           }}
-                          className="flex-1 px-2 py-1 border border-border rounded text-sm bg-white dark:bg-gray-600 text-text"
+                          className="flex-1 px-2 py-1 border border-border rounded text-sm bg-bg text-text"
                         >
                           <option value="">Ordner wählen...</option>
                           {folders.map((folder) => (
@@ -365,7 +371,7 @@ const RuleEditModal = ({
                           onChange={(e) =>
                             handleUpdateAction(index, { targetCategory: e.target.value })
                           }
-                          className="flex-1 px-2 py-1 border border-border rounded text-sm bg-white dark:bg-gray-600 text-text"
+                          className="flex-1 px-2 py-1 border border-border rounded text-sm bg-bg text-text"
                         >
                           <option value="">Kategorie wählen...</option>
                           {categories.map((cat) => (
@@ -399,7 +405,7 @@ const RuleEditModal = ({
               </button>
 
               {showAddAction && (
-                <div className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 border border-border rounded-lg shadow-lg z-10 py-1 min-w-[200px]">
+                <div className="absolute top-full mt-1 left-0 bg-card border border-border rounded-lg shadow-lg z-10 py-1 min-w-[200px]">
                   {[
                     { type: 'move' as const, label: 'Verschieben' },
                     { type: 'categorize' as const, label: 'Kategorisieren' },
@@ -452,7 +458,7 @@ const RuleEditModal = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border bg-gray-50 dark:bg-gray-700">
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border bg-bg">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
@@ -475,6 +481,9 @@ const RuleEditModal = ({
 
 export const RulesManager = () => {
   const [rules, setRules] = useState<EmailRule[]>([]);
+  // Tracks which rule ids originate from the server-side rules table so CRUD
+  // can route to /api/rules for those and stay on localStorage for the rest.
+  const [serverIds, setServerIds] = useState<Set<string>>(new Set());
   const [autoRun, setAutoRun] = useState(true);
   const [folders, setFolders] = useState<FolderWithPath[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -483,10 +492,30 @@ export const RulesManager = () => {
   const [isNewRule, setIsNewRule] = useState(false);
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [applyDialog, setApplyDialog] = useState<{ ruleId?: string; ruleName?: string } | null>(null);
+
+  // Merge local + server rules. Server wins on id collision (canonical source
+  // for everything created via Smart-Rules or the backend). Local-only rules
+  // stay listed as usual.
+  const reloadAllRules = async () => {
+    const local = loadRules();
+    setRules(local);
+    try {
+      const server = await fetchServerRules();
+      const serverIdSet = new Set(server.map(r => r.id));
+      setServerIds(serverIdSet);
+      const byId = new Map<string, EmailRule>();
+      for (const r of local) byId.set(r.id, r);
+      for (const r of server) byId.set(r.id, r);
+      setRules(Array.from(byId.values()).sort((a, b) => a.priority - b.priority));
+    } catch {
+      // Server unreachable → stick with local only.
+    }
+  };
 
   // Load data on mount
   useEffect(() => {
-    setRules(loadRules());
+    void reloadAllRules();
     setAutoRun(isAutoRunEnabled());
     setCategories(getActiveCategories());
 
@@ -522,43 +551,88 @@ export const RulesManager = () => {
     setShowEditModal(true);
   };
 
-  const handleSaveRule = (ruleData: Partial<EmailRule>) => {
-    if (isNewRule) {
-      createRule(
-        ruleData.name!,
-        ruleData.criteria!,
-        ruleData.actions!,
-        {
-          description: ruleData.description,
-          enabled: ruleData.enabled,
-          stopProcessing: ruleData.stopProcessing,
+  const handleSaveRule = async (ruleData: Partial<EmailRule>) => {
+    try {
+      if (isNewRule) {
+        createRule(
+          ruleData.name!,
+          ruleData.criteria!,
+          ruleData.actions!,
+          {
+            description: ruleData.description,
+            enabled: ruleData.enabled,
+            stopProcessing: ruleData.stopProcessing,
+          }
+        );
+        showMessage('success', 'Regel erstellt');
+      } else if (editingRule) {
+        if (serverIds.has(editingRule.id)) {
+          await updateServerRule(editingRule.id, ruleData);
+        } else {
+          updateRule(editingRule.id, ruleData);
         }
-      );
-      showMessage('success', 'Regel erstellt');
-    } else if (editingRule) {
-      updateRule(editingRule.id, ruleData);
-      showMessage('success', 'Regel aktualisiert');
+        showMessage('success', 'Regel aktualisiert');
+      }
+      await reloadAllRules();
+      setShowEditModal(false);
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
     }
-    setRules(loadRules());
-    setShowEditModal(false);
   };
 
-  const handleDeleteRule = (id: string) => {
-    if (confirm('Möchten Sie diese Regel wirklich löschen?')) {
-      deleteRule(id);
-      setRules(loadRules());
+  const handleDeleteRule = async (id: string) => {
+    if (!confirm('Möchten Sie diese Regel wirklich löschen?')) return;
+    try {
+      if (serverIds.has(id)) {
+        await deleteServerRule(id);
+      } else {
+        deleteRule(id);
+      }
+      await reloadAllRules();
       showMessage('success', 'Regel gelöscht');
+    } catch (err) {
+      showMessage('error', err instanceof Error ? err.message : 'Löschen fehlgeschlagen');
     }
   };
 
-  const handleToggleRule = (id: string) => {
-    toggleRule(id);
-    setRules(loadRules());
+  const handleToggleRule = async (id: string) => {
+    if (serverIds.has(id)) {
+      // Server rule: find current enabled state and flip
+      const rule = rules.find(r => r.id === id);
+      if (!rule) return;
+      try {
+        await updateServerRule(id, { enabled: !rule.enabled });
+        await reloadAllRules();
+      } catch (err) {
+        showMessage('error', err instanceof Error ? err.message : 'Umschalten fehlgeschlagen');
+      }
+    } else {
+      toggleRule(id);
+      setRules(loadRules());
+    }
   };
 
   const handleDuplicateRule = (id: string) => {
-    duplicateRule(id);
-    setRules(loadRules());
+    // Duplicates stay local for now. If the source was a server rule we
+    // still fork it into localStorage so the user can tweak it safely.
+    const rule = rules.find(r => r.id === id);
+    if (!rule) return;
+    if (serverIds.has(id)) {
+      createRule(
+        `${rule.name} (Kopie)`,
+        rule.criteria,
+        rule.actions,
+        {
+          description: rule.description,
+          enabled: rule.enabled,
+          stopProcessing: rule.stopProcessing,
+        }
+      );
+      void reloadAllRules();
+    } else {
+      duplicateRule(id);
+      setRules(loadRules());
+    }
     showMessage('success', 'Regel dupliziert');
   };
 
@@ -581,7 +655,7 @@ export const RulesManager = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'postpilot-rules.json';
+    a.download = 'mailsort-rules.json';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -632,7 +706,7 @@ export const RulesManager = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-border">
+    <div className="bg-card rounded-xl border border-border">
       <div className="px-6 py-4 border-b border-border">
         <div className="flex items-center justify-between">
           <div>
@@ -697,8 +771,8 @@ export const RulesManager = () => {
                 key={rule.id}
                 className={`border rounded-lg transition-colors ${
                   rule.enabled
-                    ? 'border-border bg-white dark:bg-gray-700'
-                    : 'border-border/50 bg-gray-50 dark:bg-gray-800 opacity-60'
+                    ? 'border-border bg-bg'
+                    : 'border-border/50 bg-bg opacity-60'
                 }`}
               >
                 {/* Rule Header */}
@@ -743,7 +817,17 @@ export const RulesManager = () => {
                       }
                       className="text-left w-full"
                     >
-                      <p className="font-medium text-text truncate">{rule.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-text truncate">{rule.name}</p>
+                        {serverIds.has(rule.id) && (
+                          <span
+                            className="inline-flex items-center flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200"
+                            title="Diese Regel wird serverseitig ausgefuehrt und ist fuer alle Geraete dieses Tenants aktiv."
+                          >
+                            Server
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-text-secondary truncate">
                         {getActionSummary(rule.actions)}
                       </p>
@@ -756,6 +840,13 @@ export const RulesManager = () => {
                         {rule.triggerCount}×
                       </span>
                     )}
+                    <button
+                      onClick={() => setApplyDialog({ ruleId: rule.id, ruleName: rule.name })}
+                      className="p-1.5 text-text-secondary hover:text-primary transition-colors"
+                      title="Jetzt auf Inbox anwenden"
+                    >
+                      <Play className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => handleEditRule(rule)}
                       className="p-1.5 text-text-secondary hover:text-primary transition-colors"
@@ -829,7 +920,15 @@ export const RulesManager = () => {
 
         {/* Actions */}
         <div className="flex items-center justify-between pt-4 border-t border-border">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setApplyDialog({})}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors font-medium"
+              title="Alle aktiven Regeln auf bestehende Inbox anwenden"
+            >
+              <Play className="w-4 h-4" />
+              Alle Regeln anwenden
+            </button>
             <button
               onClick={handleExport}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-text-secondary hover:text-text hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -868,6 +967,13 @@ export const RulesManager = () => {
           onClose={() => setShowEditModal(false)}
         />
       )}
+
+      <ApplyRulesDialog
+        isOpen={applyDialog !== null}
+        ruleId={applyDialog?.ruleId}
+        ruleName={applyDialog?.ruleName}
+        onClose={() => setApplyDialog(null)}
+      />
     </div>
   );
 };

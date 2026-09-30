@@ -12,7 +12,7 @@ export interface AuditEvent {
   emailSubject?: string;
   eventType: 'classification' | 'rule_match' | 'action_extracted' | 'action_applied' |
     'user_override' | 'email_moved' | 'email_deleted' | 'document_forwarded' |
-    'rule_dry_run' | 'error';
+    'rule_dry_run' | 'copilot_draft_generated' | 'error';
   source: 'rule' | 'ai' | 'manual' | 'auto' | 'system';
   ruleId?: string;
   ruleName?: string;

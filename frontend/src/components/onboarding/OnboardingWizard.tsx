@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMsal } from '@azure/msal-react';
 import {
   Sparkles,
   Mail,
-  Brain,
-  MessageSquare,
-  FolderOpen,
   ChevronRight,
   ChevronLeft,
   CheckCircle,
+  Rocket,
+  PlugZap,
+  Brain,
+  Zap,
+  BarChart3,
+  Shield,
 } from 'lucide-react';
 
 const ONBOARDING_COMPLETE_KEY = 'postpilot_onboarding_complete';
@@ -21,81 +25,19 @@ export const markOnboardingComplete = (): void => {
   localStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
 };
 
-interface OnboardingStep {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  color: string;
-  features: string[];
-}
-
-const steps: OnboardingStep[] = [
-  {
-    title: 'Willkommen bei PostPilot!',
-    description: 'Dein KI-Assistent für intelligentes E-Mail-Management. Lass uns kurz durch die wichtigsten Funktionen gehen.',
-    icon: <Sparkles className="w-12 h-12" />,
-    color: 'from-primary to-primary-dark',
-    features: [
-      'KI-gestützte Kategorisierung',
-      'Intelligente Antwortvorschläge',
-      'Automatische Ordnersortierung',
-    ],
-  },
-  {
-    title: 'KI-Kategorisierung',
-    description: 'PostPilot analysiert deine E-Mails und ordnet sie automatisch in 6 smarte Kategorien ein.',
-    icon: <Brain className="w-12 h-12" />,
-    color: 'from-purple-500 to-purple-700',
-    features: [
-      'Dringend - Sofortige Aufmerksamkeit erforderlich',
-      'Aktion - Antwort oder Handlung nötig',
-      'Zur Info - Keine Aktion erforderlich',
-      'Meeting - Termine und Einladungen',
-      'Finanzen - Rechnungen und Zahlungen',
-      'Intern - Interne Kommunikation',
-    ],
-  },
-  {
-    title: 'KI-Antworten',
-    description: 'Lasse dir professionelle Antworten in Sekunden generieren - in deinem bevorzugten Stil.',
-    icon: <MessageSquare className="w-12 h-12" />,
-    color: 'from-green-500 to-green-700',
-    features: [
-      '4 Antwort-Töne: Formell, Locker, Freundlich, Bestimmt',
-      'Native deutsche Formulierungen',
-      'Ein-Klick zum Senden oder Bearbeiten',
-    ],
-  },
-  {
-    title: 'Ordner-Vorschläge',
-    description: 'PostPilot schlägt den passenden Ordner für jede E-Mail vor - basierend auf Inhalt und deiner Ordnerstruktur.',
-    icon: <FolderOpen className="w-12 h-12" />,
-    color: 'from-orange-500 to-orange-700',
-    features: [
-      'Intelligente Ordnererkennung',
-      'Ein-Klick Verschieben',
-      'Lernt aus deinen Ordnern',
-    ],
-  },
-  {
-    title: 'Bereit zum Start!',
-    description: 'Du bist startklar! Klicke unten, um dein Dashboard zu öffnen und loszulegen.',
-    icon: <Mail className="w-12 h-12" />,
-    color: 'from-primary to-primary-dark',
-    features: [
-      'Dashboard mit Übersicht aller E-Mails',
-      'Smart Insights auf einen Blick',
-      'Suche und Filter für schnellen Zugriff',
-    ],
-  },
-];
-
 export const OnboardingWizard = () => {
   const navigate = useNavigate();
+  const { accounts } = useMsal();
   const [currentStep, setCurrentStep] = useState(0);
 
+  const account = accounts[0];
+  const firstName = account?.name?.split(' ')[0] || 'Nutzer';
+  const userEmail = account?.username || '';
+
+  const totalSteps = 3;
+
   const handleNext = () => {
-    if (currentStep < steps.length - 1) {
+    if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -116,51 +58,165 @@ export const OnboardingWizard = () => {
     navigate('/dashboard');
   };
 
-  const step = steps[currentStep];
-  const isLastStep = currentStep === steps.length - 1;
+  const isLastStep = currentStep === totalSteps - 1;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
       <div className="max-w-2xl w-full">
-        {/* Progress dots */}
+        {/* Progress bar */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {steps.map((_, index) => (
-            <button
+          {Array.from({ length: totalSteps }).map((_, index) => (
+            <div
               key={index}
-              onClick={() => setCurrentStep(index)}
-              className={`w-2.5 h-2.5 rounded-full transition-all ${
-                index === currentStep
-                  ? 'bg-primary w-8'
-                  : index < currentStep
-                    ? 'bg-primary'
-                    : 'bg-gray-300'
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                index <= currentStep
+                  ? 'bg-primary w-12'
+                  : 'bg-gray-300 w-8'
               }`}
             />
           ))}
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {/* Header with gradient */}
-          <div className={`bg-gradient-to-r ${step.color} p-8 text-white text-center`}>
-            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              {step.icon}
-            </div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">{step.title}</h1>
-            <p className="text-white/90">{step.description}</p>
-          </div>
+        <div className="bg-card rounded-2xl shadow-xl overflow-hidden">
+          {/* Step 1: Welcome */}
+          {currentStep === 0 && (
+            <>
+              <div className="bg-gradient-to-r from-primary to-primary-dark p-8 text-white text-center">
+                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-12 h-12" />
+                </div>
+                <h1 className="text-2xl md:text-3xl font-bold mb-2">
+                  Willkommen, {firstName}!
+                </h1>
+                <p className="text-white/90">
+                  Lass uns MailSort in 2 Minuten einrichten.
+                </p>
+              </div>
 
-          {/* Content */}
-          <div className="p-6 md:p-8">
-            <ul className="space-y-3">
-              {step.features.map((feature, index) => (
-                <li key={index} className="flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <span className="text-text">{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+              <div className="p-6 md:p-8">
+                {/* User info confirmation */}
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 flex items-center gap-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-lg">
+                    {firstName[0]}
+                  </div>
+                  <div>
+                    <p className="font-medium text-text">{account?.name || 'Nutzer'}</p>
+                    <p className="text-sm text-text-secondary">{userEmail}</p>
+                  </div>
+                  <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
+                </div>
+
+                <h3 className="font-semibold text-text mb-4">Das kann MailSort fuer dich tun:</h3>
+                <ul className="space-y-3">
+                  {[
+                    { icon: <Brain className="w-5 h-5 text-purple-600" />, text: 'E-Mails automatisch kategorisieren und priorisieren' },
+                    { icon: <Zap className="w-5 h-5 text-orange-600" />, text: 'Rechnungen, Vertraege und Dokumente erkennen' },
+                    { icon: <BarChart3 className="w-5 h-5 text-blue-600" />, text: 'Aufgaben aus E-Mails extrahieren und verwalten' },
+                    { icon: <Shield className="w-5 h-5 text-green-600" />, text: 'DSGVO-konform – keine E-Mail-Speicherung' },
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-3">
+                      {item.icon}
+                      <span className="text-text">{item.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+
+          {/* Step 2: Quick Integration Setup */}
+          {currentStep === 1 && (
+            <>
+              <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-8 text-white text-center">
+                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <PlugZap className="w-12 h-12" />
+                </div>
+                <h1 className="text-2xl md:text-3xl font-bold mb-2">
+                  Integrationen verbinden
+                </h1>
+                <p className="text-white/90">
+                  Wohin sollen erkannte Dokumente weitergeleitet werden?
+                </p>
+              </div>
+
+              <div className="p-6 md:p-8">
+                <p className="text-text-secondary mb-6">
+                  Du kannst Integrationen jetzt einrichten oder spaeter unter Einstellungen nachholen.
+                </p>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  {[
+                    { name: 'SharePoint', desc: 'Microsoft 365 Bibliothek', emoji: '📁' },
+                    { name: 'sevDesk', desc: 'Buchhaltung & Belege', emoji: '📊' },
+                    { name: 'Paperless-ngx', desc: 'Dokumenten-Archiv', emoji: '📄' },
+                    { name: 'Webhook', desc: 'Power Automate / Custom', emoji: '🔗' },
+                  ].map((integration) => (
+                    <button
+                      key={integration.name}
+                      onClick={() => {
+                        markOnboardingComplete();
+                        navigate('/integrations');
+                      }}
+                      className="text-left p-4 rounded-xl border border-border hover:border-primary hover:shadow-md transition-all group"
+                    >
+                      <span className="text-2xl mb-2 block">{integration.emoji}</span>
+                      <p className="font-medium text-text group-hover:text-primary transition-colors">
+                        {integration.name}
+                      </p>
+                      <p className="text-xs text-text-secondary">{integration.desc}</p>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleNext}
+                  className="w-full text-center text-sm text-text-secondary hover:text-text transition-colors py-2"
+                >
+                  Spaeter einrichten →
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Step 3: Ready! */}
+          {currentStep === 2 && (
+            <>
+              <div className="bg-gradient-to-r from-green-500 to-green-700 p-8 text-white text-center">
+                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Rocket className="w-12 h-12" />
+                </div>
+                <h1 className="text-2xl md:text-3xl font-bold mb-2">
+                  Alles bereit!
+                </h1>
+                <p className="text-white/90">
+                  MailSort ist startklar. Lass uns deine ersten E-Mails analysieren.
+                </p>
+              </div>
+
+              <div className="p-6 md:p-8">
+                <div className="space-y-4 mb-6">
+                  {[
+                    { label: 'Microsoft-Konto verbunden', done: true },
+                    { label: 'E-Mail-Zugriff genehmigt', done: true },
+                    { label: 'KI-Engine bereit', done: true },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <span className="text-text font-medium">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+                  <p className="text-sm text-text-secondary">
+                    <strong className="text-text">Tipp:</strong> Oeffne den Posteingang im Dashboard und klicke auf
+                    "Alle verarbeiten" um deine E-Mails sofort zu kategorisieren.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Footer */}
           <div className="px-6 md:px-8 pb-6 md:pb-8 flex items-center justify-between">
@@ -168,7 +224,7 @@ export const OnboardingWizard = () => {
               onClick={handleSkip}
               className="text-text-secondary hover:text-text transition-colors text-sm"
             >
-              Überspringen
+              Ueberspringen
             </button>
 
             <div className="flex items-center gap-3">
@@ -178,7 +234,7 @@ export const OnboardingWizard = () => {
                   className="flex items-center gap-1 px-4 py-2 text-text-secondary hover:text-text transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                  Zurück
+                  Zurueck
                 </button>
               )}
 
@@ -187,8 +243,8 @@ export const OnboardingWizard = () => {
                   onClick={handleComplete}
                   className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
                 >
-                  Los geht's!
-                  <Sparkles className="w-4 h-4" />
+                  Dashboard oeffnen
+                  <Mail className="w-4 h-4" />
                 </button>
               ) : (
                 <button
@@ -205,7 +261,7 @@ export const OnboardingWizard = () => {
 
         {/* Step counter */}
         <p className="text-center text-text-secondary text-sm mt-4">
-          Schritt {currentStep + 1} von {steps.length}
+          Schritt {currentStep + 1} von {totalSteps}
         </p>
       </div>
     </div>

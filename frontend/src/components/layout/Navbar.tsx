@@ -11,7 +11,7 @@ export const Navbar = ({ onMenuClick }: NavbarProps) => {
   const isAuthenticated = useIsAuthenticated();
 
   return (
-    <nav className="bg-white border-b border-border px-4 py-3 flex items-center justify-between">
+    <nav className="bg-card border-b border-border px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
         {isAuthenticated && (
           <button

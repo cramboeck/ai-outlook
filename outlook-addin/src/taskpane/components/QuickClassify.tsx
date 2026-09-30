@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { apiCall } from '../../services/officeAuth';
+import { applyOutlookCategory } from '../../services/officeAttachments';
 
 interface EmailData {
   id: string;
@@ -21,12 +22,14 @@ interface Classification {
 export function QuickClassify({ email }: { email: EmailData }) {
   const [classification, setClassification] = useState<Classification | null>(null);
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const classify = async () => {
     setLoading(true);
     setError(null);
+    setApplied(false);
     try {
       const result = await apiCall<Classification>('/classify', {
         method: 'POST',
@@ -43,10 +46,21 @@ export function QuickClassify({ email }: { email: EmailData }) {
     setLoading(false);
   };
 
+  // Assigns the AI-suggested category directly to the Outlook item using the
+  // Office.js mailbox categories API. If the category is not yet in the
+  // user's master list we create it first (see officeAttachments helper).
   const applyCategory = async () => {
     if (!classification) return;
-    // TODO: Apply category via Graph API using Office context
-    setApplied(true);
+    setApplying(true);
+    setError(null);
+    try {
+      await applyOutlookCategory(classification.category);
+      setApplied(true);
+    } catch (err) {
+      setError(`Kategorie konnte nicht zugewiesen werden: ${(err as Error).message}`);
+    } finally {
+      setApplying(false);
+    }
   };
 
   const urgencyColors: Record<string, string> = {
@@ -125,23 +139,24 @@ export function QuickClassify({ email }: { email: EmailData }) {
           {!applied ? (
             <button
               onClick={applyCategory}
+              disabled={applying}
               style={{
                 width: '100%',
                 padding: '10px',
-                background: '#16a34a',
+                background: applying ? '#9ca3af' : '#16a34a',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
                 fontSize: '13px',
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: applying ? 'wait' : 'pointer',
               }}
             >
-              Kategorie anwenden
+              {applying ? 'Wird angewendet...' : 'Kategorie in Outlook setzen'}
             </button>
           ) : (
             <div style={{ textAlign: 'center', padding: '10px', color: '#16a34a', fontWeight: 600, fontSize: '13px' }}>
-              Kategorie angewendet
+              ✓ Kategorie angewendet
             </div>
           )}
 

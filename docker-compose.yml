@@ -11,7 +11,9 @@ services:
       POSTGRES_PASSWORD: postpilot_dev_123
       POSTGRES_DB: postpilot
     ports:
-      - "5432:5432"
+      # Host-Port 5433, damit zerostress-postgres oder andere lokale
+      # Postgres-Instanzen auf 5432 parallel laufen können.
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql

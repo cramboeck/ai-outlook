@@ -47,7 +47,7 @@ export const StatsCards = ({ total, uncategorized, byCategory, isLoading }: Stat
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white rounded-xl p-5 border border-border animate-pulse">
+          <div key={i} className="bg-card rounded-xl p-5 border border-border animate-pulse">
             <div className="h-10 w-10 bg-gray-200 rounded-lg mb-3" />
             <div className="h-8 w-16 bg-gray-200 rounded mb-1" />
             <div className="h-4 w-20 bg-gray-200 rounded" />
@@ -62,7 +62,7 @@ export const StatsCards = ({ total, uncategorized, byCategory, isLoading }: Stat
       {cards.map((card) => (
         <div
           key={card.label}
-          className="bg-white rounded-xl p-5 border border-border hover:shadow-md transition-shadow"
+          className="bg-card rounded-xl p-5 border border-border hover:shadow-md transition-shadow"
         >
           <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${card.color} mb-3`}>
             {card.emoji ? (

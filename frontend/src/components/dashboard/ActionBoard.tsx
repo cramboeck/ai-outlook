@@ -200,7 +200,7 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
 
   if (relevantEmails.length === 0 && !hasExtracted) {
     return (
-      <div className="bg-white border border-border rounded-xl p-6 text-center">
+      <div className="bg-card border border-border rounded-xl p-6 text-center">
         <span className="text-4xl mb-3 block">📋</span>
         <h3 className="font-semibold text-text mb-1">Keine aktionsrelevanten Mails</h3>
         <p className="text-sm text-text-secondary">
@@ -212,7 +212,7 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
 
   return (
     <>
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-text flex items-center gap-2">
@@ -357,7 +357,7 @@ export const ActionBoard = ({ emails, onRefresh }: ActionBoardProps) => {
                           </div>
 
                           {/* Email Body Preview */}
-                          <div className="bg-white rounded-lg border border-border p-4 max-h-64 overflow-y-auto">
+                          <div className="bg-card rounded-lg border border-border p-4 max-h-64 overflow-y-auto">
                             <div
                               className="email-content text-sm text-text"
                               dangerouslySetInnerHTML={{

@@ -3,18 +3,19 @@ import { Request } from 'express';
 
 /**
  * Rate limiter for AI endpoints - 60 requests per minute per tenant.
- * Uses tenant ID from auth middleware as key.
+ * Uses tenant ID from auth middleware as key (no IP fallback needed).
  */
 export const aiRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 60,
-  keyGenerator: (req: Request) => req.tenantId || req.ip || 'unknown',
+  keyGenerator: (req: Request) => req.tenantId || 'anonymous',
   message: {
     error: 'Too many AI requests. Please wait a moment.',
     retryAfter: 60,
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 /**
@@ -23,11 +24,12 @@ export const aiRateLimiter = rateLimit({
 export const crudRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 200,
-  keyGenerator: (req: Request) => req.tenantId || req.ip || 'unknown',
+  keyGenerator: (req: Request) => req.tenantId || 'anonymous',
   message: {
     error: 'Too many requests. Please wait a moment.',
     retryAfter: 60,
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });

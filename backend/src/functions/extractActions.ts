@@ -117,7 +117,7 @@ Inhalt: ${(email.body || email.subject).substring(0, 800)}
         { role: 'user', content: userMessage },
       ],
       temperature: 0.3,
-      max_tokens: 4000,
+      max_tokens: 400,
       response_format: { type: 'json_object' },
     });
 

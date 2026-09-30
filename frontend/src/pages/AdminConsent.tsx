@@ -53,7 +53,7 @@ export const AdminConsent = () => {
             </div>
             <h1 className="text-2xl font-bold text-text mb-2">Erfolgreich eingerichtet!</h1>
             <p className="text-text-secondary mb-6">
-              PostPilot wurde erfolgreich für Ihre Organisation freigegeben.
+              MailSort wurde erfolgreich für Ihre Organisation freigegeben.
               {tenantId && (
                 <span className="block mt-2 text-sm">
                   Tenant: <code className="bg-gray-100 px-2 py-0.5 rounded">{tenantId}</code>
@@ -110,7 +110,7 @@ export const AdminConsent = () => {
               </button>
               <p className="text-sm text-text-secondary">
                 Benötigen Sie Hilfe?{' '}
-                <a href="mailto:support@postpilot.app" className="text-primary hover:underline">
+                <a href="mailto:support@ramboeck-it.com" className="text-primary hover:underline">
                   Kontaktieren Sie uns
                 </a>
               </p>

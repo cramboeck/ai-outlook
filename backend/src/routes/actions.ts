@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import { query, queryOne } from '../db';
 import { logEvent } from '../services/auditService';
+import { forwardToAllMatchingIntegrations } from '../services/forwardService';
 import { logger } from '../services/logger';
 
 const router = Router();
@@ -11,28 +12,42 @@ const router = Router();
 // GET /api/actions - List actions with filters
 router.get('/', async (req, res, next) => {
   try {
-    const { status, priority, type, deadline_before, limit = '50', offset = '0' } = req.query;
+    const { status, priority, type, document_type, deadline_before, search, limit = '50', offset = '0' } = req.query;
 
-    let sql = 'SELECT * FROM actions WHERE tenant_id = $1 AND user_id = $2';
-    const params: any[] = [req.tenantId, req.userId];
-    let idx = 3;
+    let sql = 'SELECT * FROM actions WHERE tenant_id = $1';
+    const params: any[] = [req.tenantId];
+    let idx = 2;
 
     if (status) {
       const statuses = (status as string).split(',');
-      sql += ` AND status = ANY($${idx++})`;
-      params.push(statuses);
+      const placeholders = statuses.map(() => `$${idx++}`).join(', ');
+      sql += ` AND status IN (${placeholders})`;
+      params.push(...statuses);
     }
     if (priority) {
       sql += ` AND priority = $${idx++}`;
       params.push(priority);
     }
     if (type) {
-      sql += ` AND action_type = $${idx++}`;
-      params.push(type);
+      if (type === 'document') {
+        sql += ` AND document_type IS NOT NULL AND document_type != 'none'`;
+      } else {
+        sql += ` AND action_type = $${idx++}`;
+        params.push(type);
+      }
+    }
+    if (document_type) {
+      sql += ` AND document_type = $${idx++}`;
+      params.push(document_type);
     }
     if (deadline_before) {
       sql += ` AND deadline <= $${idx++}`;
       params.push(deadline_before);
+    }
+    if (search) {
+      sql += ` AND (description LIKE $${idx} OR email_subject LIKE $${idx})`;
+      params.push(`%${search}%`);
+      idx++;
     }
 
     sql += ` ORDER BY
@@ -43,8 +58,14 @@ router.get('/', async (req, res, next) => {
     params.push(Math.min(parseInt(limit as string) || 50, 200));
     params.push(parseInt(offset as string) || 0);
 
+    // Count query (same WHERE, no LIMIT/OFFSET)
+    const countSql = sql.replace(/ORDER BY[\s\S]*$/, '').replace('SELECT *', 'SELECT COUNT(*) as count');
+    const countParams = params.slice(0, -2); // remove limit+offset
+    const countResult = await query(countSql, countParams);
+    const total = parseInt(countResult[0]?.count || '0', 10);
+
     const rows = await query(sql, params);
-    res.json({ items: rows });
+    res.json({ items: rows, total });
   } catch (error) {
     next(error);
   }
@@ -60,13 +81,13 @@ router.get('/summary', async (req, res, next) => {
       done_this_week: string;
     }>(`
       SELECT
-        COUNT(*) FILTER (WHERE status = 'open') as open,
-        COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
-        COUNT(*) FILTER (WHERE status IN ('open', 'in_progress') AND deadline < CURRENT_DATE) as overdue,
-        COUNT(*) FILTER (WHERE status = 'done' AND completed_at >= NOW() - INTERVAL '7 days') as done_this_week
+        SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open,
+        SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+        SUM(CASE WHEN status IN ('open', 'in_progress') AND deadline < CURRENT_DATE THEN 1 ELSE 0 END) as overdue,
+        SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done_this_week
       FROM actions
-      WHERE tenant_id = $1 AND user_id = $2
-    `, [req.tenantId, req.userId]);
+      WHERE tenant_id = $1
+    `, [req.tenantId]);
 
     res.json(summary);
   } catch (error) {
@@ -79,11 +100,11 @@ router.get('/overdue', async (req, res, next) => {
   try {
     const rows = await query(
       `SELECT * FROM actions
-       WHERE tenant_id = $1 AND user_id = $2
+       WHERE tenant_id = $1
        AND status IN ('open', 'in_progress')
        AND deadline < CURRENT_DATE
        ORDER BY deadline ASC`,
-      [req.tenantId, req.userId]
+      [req.tenantId]
     );
     res.json({ items: rows });
   } catch (error) {
@@ -134,7 +155,7 @@ router.post('/', async (req, res, next) => {
 // PATCH /api/actions/:id - Update action
 router.patch('/:id', async (req, res, next) => {
   try {
-    const { description, priority, deadline, notes, status } = req.body;
+    const { description, priority, deadline, notes, status, document_data } = req.body;
 
     const existing = await queryOne<any>(
       'SELECT * FROM actions WHERE id = $1 AND tenant_id = $2',
@@ -152,6 +173,7 @@ router.patch('/:id', async (req, res, next) => {
     if (priority !== undefined) { updates.push(`priority = $${idx++}`); params.push(priority); }
     if (deadline !== undefined) { updates.push(`deadline = $${idx++}`); params.push(deadline || null); }
     if (notes !== undefined) { updates.push(`notes = $${idx++}`); params.push(notes); }
+    if (document_data !== undefined) { updates.push(`document_data = $${idx++}`); params.push(JSON.stringify(document_data)); }
     if (status !== undefined) {
       updates.push(`status = $${idx++}`);
       params.push(status);
@@ -177,18 +199,18 @@ router.patch('/:id', async (req, res, next) => {
   }
 });
 
-// PATCH /api/actions/:id/status - Quick status change
+// PATCH /api/actions/:id/status - Quick status change + Freigabe-Workflow
 router.patch('/:id/status', async (req, res, next) => {
   try {
-    const { status } = req.body;
-    const validStatuses = ['open', 'in_progress', 'done', 'dismissed'];
+    const { status, attachment, access_token } = req.body;
+    const validStatuses = ['open', 'in_progress', 'approved', 'done', 'dismissed'];
 
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
     }
 
     let extraSql = '';
-    if (status === 'done') extraSql = ', completed_at = NOW()';
+    if (status === 'done' || status === 'approved') extraSql = ', completed_at = NOW()';
     if (status === 'dismissed') extraSql = ', dismissed_at = NOW()';
 
     const rows = await query(
@@ -200,16 +222,73 @@ router.patch('/:id/status', async (req, res, next) => {
       return res.status(404).json({ error: 'Action not found' });
     }
 
+    const action = rows[0];
+
+    // Freigabe-Workflow: When status = 'approved', forward to all matching integrations
+    if (status === 'approved' && action.document_type && action.document_type !== 'none') {
+      try {
+        const forwardResults = await forwardToAllMatchingIntegrations(req.tenantId!, action, attachment, access_token);
+        const successCount = forwardResults.filter(r => r.success).length;
+
+        // Update action with forward results and set to done
+        const forwardedTo = JSON.stringify(forwardResults.map(r => ({
+          integration_id: r.integration_id,
+          integration_name: r.integration_name,
+          integration_type: r.integration_type,
+          timestamp: r.timestamp,
+          status: r.success ? 'success' : 'error',
+          message: r.message,
+          ...(r.document_id ? { document_id: r.document_id } : {}),
+          ...(r.document_url ? { document_url: r.document_url } : {}),
+        })));
+
+        const finalStatus = successCount > 0 ? 'done' : 'approved';
+        await query(
+          `UPDATE actions SET status = $1, forwarded_to = $2 WHERE id = $3`,
+          [finalStatus, forwardedTo, req.params.id]
+        );
+
+        // Re-fetch updated action
+        const updated = await queryOne('SELECT * FROM actions WHERE id = $1', [req.params.id]);
+
+        await logEvent({
+          tenantId: req.tenantId!,
+          userId: req.userId,
+          emailId: action.email_id,
+          eventType: 'action_applied',
+          source: 'manual',
+          metadata: {
+            actionId: req.params.id,
+            newStatus: finalStatus,
+            forwardResults: forwardResults.map(r => ({ type: r.integration_type, success: r.success })),
+          },
+        });
+
+        return res.json({
+          ...updated,
+          _forwardResults: forwardResults,
+          _forwardSummary: `${successCount}/${forwardResults.length} Integrationen erfolgreich`,
+        });
+      } catch (forwardError) {
+        logger.error('Freigabe forward error', { error: (forwardError as Error).message });
+        // Still return the action, but note the error
+        return res.json({
+          ...action,
+          _forwardError: (forwardError as Error).message,
+        });
+      }
+    }
+
     await logEvent({
       tenantId: req.tenantId!,
       userId: req.userId,
-      emailId: rows[0].email_id,
+      emailId: action.email_id,
       eventType: 'action_applied',
       source: 'manual',
       metadata: { actionId: req.params.id, newStatus: status },
     });
 
-    res.json(rows[0]);
+    res.json(action);
   } catch (error) {
     next(error);
   }

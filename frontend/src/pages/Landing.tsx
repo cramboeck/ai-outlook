@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
+import { motion, useInView, useMotionValue, useTransform, animate } from 'framer-motion';
 import {
   Sparkles,
   Mail,
@@ -29,6 +30,116 @@ import {
 } from 'lucide-react';
 import { graphScopes, getAdminConsentUrl } from '../config/msalConfig';
 
+// Animation variants
+const fadeInUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const fadeIn = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+// Animated counter component
+const AnimatedCounter = ({ target, suffix = '' }: { target: number; suffix?: string }) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: '-50px' });
+  const count = useMotionValue(0);
+  const rounded = useTransform(count, (v) =>
+    suffix === 'h' ? v.toFixed(1) : suffix === '%' ? Math.round(v) : Math.round(v)
+  );
+  const [display, setDisplay] = useState('0');
+
+  useEffect(() => {
+    if (isInView) {
+      const controls = animate(count, target, {
+        duration: 2,
+        ease: 'easeOut',
+      });
+      const unsubscribe = rounded.on('change', (v) => setDisplay(String(v)));
+      return () => {
+        controls.stop();
+        unsubscribe();
+      };
+    }
+  }, [isInView, target, count, rounded]);
+
+  return (
+    <span ref={ref}>
+      {display}{suffix}
+    </span>
+  );
+};
+
+// Section wrapper with scroll-triggered animation
+const AnimatedSection = ({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: '-80px' });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? 'visible' : 'hidden'}
+      variants={fadeInUp}
+      transition={{ duration: 0.6, delay, ease: 'easeOut' }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+const featureCards = [
+  { icon: <Brain className="w-6 h-6 text-blue-600" />, bg: 'bg-blue-100', title: 'KI-Kategorisierung', desc: 'Automatische Einsortierung in 6 smarte Kategorien: Dringend, Aktion erforderlich, Meeting, Finanzen, Intern, Zur Info.' },
+  { icon: <Zap className="w-6 h-6 text-purple-600" />, bg: 'bg-purple-100', title: 'Smart Insights', desc: 'Sofort sehen was wichtig ist: Dringende Mails, offene Aufgaben, überfällige Antworten – alles auf einen Blick.' },
+  { icon: <MessageSquare className="w-6 h-6 text-green-600" />, bg: 'bg-green-100', title: 'KI-Antworten', desc: 'Professionelle Antworten in Sekunden. Wähle Ton und Absicht – die KI formuliert perfekt auf Deutsch.' },
+  { icon: <BarChart3 className="w-6 h-6 text-orange-600" />, bg: 'bg-orange-100', title: 'Action Board', desc: 'Aufgaben werden automatisch aus E-Mails extrahiert. Deadlines erkannt, Prioritäten gesetzt – nie wieder vergessen.' },
+  { icon: <Clock className="w-6 h-6 text-red-600" />, bg: 'bg-red-100', title: 'Wochen-Briefing', desc: 'Wöchentliche Übersicht: Top-Absender, Kategorieverteilung, Trends – verstehe dein E-Mail-Verhalten.' },
+  { icon: <Shield className="w-6 h-6 text-teal-600" />, bg: 'bg-teal-100', title: 'DSGVO & Sicherheit', desc: 'Deine Daten bleiben in der EU. Keine E-Mail-Speicherung, Ende-zu-Ende verschlüsselt, Microsoft-zertifiziert.' },
+];
+
+const FeatureGrid = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: '-50px' });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? 'visible' : 'hidden'}
+      variants={staggerContainer}
+      className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+    >
+      {featureCards.map((card, i) => (
+        <motion.div
+          key={i}
+          variants={fadeInUp}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          className="bg-white p-6 md:p-8 rounded-2xl border border-border hover:shadow-lg transition-shadow"
+        >
+          <div className={`w-12 h-12 ${card.bg} rounded-xl flex items-center justify-center mb-4`}>
+            {card.icon}
+          </div>
+          <h3 className="text-xl font-semibold text-text mb-3">{card.title}</h3>
+          <p className="text-text-secondary">{card.desc}</p>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+};
+
 export const Landing = () => {
   const navigate = useNavigate();
   const { instance } = useMsal();
@@ -51,11 +162,27 @@ export const Landing = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // TODO: Connect to backend/newsletter service
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:7071';
+      const response = await fetch(`${apiBase}/api/beta-signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
 
-    setSubmitted(true);
-    setIsSubmitting(false);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Registrierung fehlgeschlagen');
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Beta signup error:', err);
+      // Still show success to avoid leaking whether email exists
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -69,7 +196,7 @@ export const Landing = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold text-text">PostPilot</span>
+                <span className="text-xl font-bold text-text">MailSort</span>
                 <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
                   BETA
                 </span>
@@ -103,29 +230,51 @@ export const Landing = () => {
       {/* Hero Section */}
       <section className="max-w-6xl mx-auto px-4 py-16 md:py-24">
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-6"
+          >
             <Rocket className="w-4 h-4" />
             Early Bird: 50% Rabatt für die ersten 100 Nutzer!
-          </div>
+          </motion.div>
 
-          <h1 className="text-4xl md:text-6xl font-bold text-text mb-6 leading-tight">
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-4xl md:text-6xl font-bold text-text mb-6 leading-tight"
+          >
             Dein KI-Assistent für<br />
             <span className="text-primary">intelligentes E-Mail-Management</span>
-          </h1>
+          </motion.h1>
 
-          <p className="text-lg md:text-xl text-text-secondary max-w-2xl mx-auto mb-10">
-            PostPilot kategorisiert, priorisiert und beantwortet deine E-Mails automatisch.
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.35 }}
+            className="text-lg md:text-xl text-text-secondary max-w-2xl mx-auto mb-10"
+          >
+            MailSort kategorisiert, priorisiert und beantwortet deine E-Mails automatisch.
             Spare 2+ Stunden täglich und verpasse nie wieder wichtige Nachrichten.
-          </p>
+          </motion.p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <button
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12"
+          >
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleLogin}
               className="flex items-center gap-2 px-8 py-4 bg-primary text-white rounded-xl hover:bg-primary-dark transition-all shadow-lg hover:shadow-xl text-lg font-medium w-full sm:w-auto justify-center"
             >
               <Sparkles className="w-5 h-5" />
               Kostenlos testen
-            </button>
+            </motion.button>
             <a
               href="#demo"
               className="flex items-center gap-2 px-8 py-4 border border-border rounded-xl hover:bg-gray-50 transition-colors text-lg w-full sm:w-auto justify-center"
@@ -133,10 +282,15 @@ export const Landing = () => {
               <Play className="w-5 h-5" />
               Demo ansehen
             </a>
-          </div>
+          </motion.div>
 
           {/* Trust Badges */}
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-text-secondary">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+            className="flex flex-wrap items-center justify-center gap-6 text-sm text-text-secondary"
+          >
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-green-600" />
               <span>DSGVO-konform</span>
@@ -149,121 +303,63 @@ export const Landing = () => {
               <Globe className="w-5 h-5 text-green-600" />
               <span>Für Microsoft 365</span>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Problem Section */}
       <section className="bg-dark text-white py-16">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
-            Das E-Mail-Chaos kostet dich Zeit und Nerven
-          </h2>
+          <AnimatedSection>
+            <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
+              Das E-Mail-Chaos kostet dich Zeit und Nerven
+            </h2>
+          </AnimatedSection>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">121</div>
+            <AnimatedSection className="text-center" delay={0.1}>
+              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">
+                <AnimatedCounter target={121} />
+              </div>
               <p className="text-gray-400">E-Mails pro Tag im Durchschnitt</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">2.5h</div>
+            </AnimatedSection>
+            <AnimatedSection className="text-center" delay={0.2}>
+              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">
+                <AnimatedCounter target={2.5} suffix="h" />
+              </div>
               <p className="text-gray-400">täglich für E-Mails verschwendet</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">23%</div>
+            </AnimatedSection>
+            <AnimatedSection className="text-center" delay={0.3}>
+              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">
+                <AnimatedCounter target={23} suffix="%" />
+              </div>
               <p className="text-gray-400">wichtige Mails werden übersehen</p>
-            </div>
+            </AnimatedSection>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
       <section id="features" className="max-w-6xl mx-auto px-4 py-16 md:py-20">
-        <div className="text-center mb-12">
+        <AnimatedSection className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-text mb-4">
             Alles was du brauchst, um E-Mails zu meistern
           </h2>
           <p className="text-lg text-text-secondary">
             Powered by GPT-4 – optimiert für deutschsprachige Geschäftskommunikation
           </p>
-        </div>
+        </AnimatedSection>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 md:p-8 rounded-2xl border border-border hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-              <Brain className="w-6 h-6 text-blue-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-text mb-3">KI-Kategorisierung</h3>
-            <p className="text-text-secondary">
-              Automatische Einsortierung in 6 smarte Kategorien: Dringend, Aktion erforderlich,
-              Meeting, Finanzen, Intern, Zur Info.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 md:p-8 rounded-2xl border border-border hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
-              <Zap className="w-6 h-6 text-purple-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-text mb-3">Smart Insights</h3>
-            <p className="text-text-secondary">
-              Sofort sehen was wichtig ist: Dringende Mails, offene Aufgaben, überfällige
-              Antworten – alles auf einen Blick.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 md:p-8 rounded-2xl border border-border hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
-              <MessageSquare className="w-6 h-6 text-green-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-text mb-3">KI-Antworten</h3>
-            <p className="text-text-secondary">
-              Professionelle Antworten in Sekunden. Wähle Ton und Absicht – die KI
-              formuliert perfekt auf Deutsch.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 md:p-8 rounded-2xl border border-border hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
-              <BarChart3 className="w-6 h-6 text-orange-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-text mb-3">Action Board</h3>
-            <p className="text-text-secondary">
-              Aufgaben werden automatisch aus E-Mails extrahiert. Deadlines erkannt,
-              Prioritäten gesetzt – nie wieder vergessen.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 md:p-8 rounded-2xl border border-border hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mb-4">
-              <Clock className="w-6 h-6 text-red-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-text mb-3">Wochen-Briefing</h3>
-            <p className="text-text-secondary">
-              Wöchentliche Übersicht: Top-Absender, Kategorieverteilung, Trends –
-              verstehe dein E-Mail-Verhalten.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 md:p-8 rounded-2xl border border-border hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center mb-4">
-              <Shield className="w-6 h-6 text-teal-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-text mb-3">DSGVO & Sicherheit</h3>
-            <p className="text-text-secondary">
-              Deine Daten bleiben in der EU. Keine E-Mail-Speicherung, Ende-zu-Ende
-              verschlüsselt, Microsoft-zertifiziert.
-            </p>
-          </div>
-        </div>
+        <FeatureGrid />
       </section>
 
-      {/* Why PostPilot Section */}
+      {/* Why MailSort Section */}
       <section className="bg-primary/5 py-16">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-text mb-4">
             Speziell für den deutschen Markt entwickelt
           </h2>
           <p className="text-center text-text-secondary mb-12 max-w-2xl mx-auto">
-            PostPilot wurde von Grund auf für deutschsprachige Geschäftskommunikation konzipiert
+            MailSort wurde von Grund auf für deutschsprachige Geschäftskommunikation konzipiert
           </p>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white rounded-xl p-6 border border-border text-center">
@@ -313,7 +409,7 @@ export const Landing = () => {
 
       {/* Pricing Section */}
       <section id="pricing" className="max-w-6xl mx-auto px-4 py-16 md:py-20">
-        <div className="text-center mb-12">
+        <AnimatedSection className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-yellow-50 text-yellow-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
             <Star className="w-4 h-4" />
             Early Bird: 50% Rabatt – nur für kurze Zeit!
@@ -324,7 +420,7 @@ export const Landing = () => {
           <p className="text-lg text-text-secondary">
             Starte kostenlos, upgrade wenn du mehr brauchst
           </p>
-        </div>
+        </AnimatedSection>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {/* Free Tier */}
@@ -367,9 +463,13 @@ export const Landing = () => {
 
           {/* Pro Tier */}
           <div className="bg-white p-6 md:p-8 rounded-2xl border-2 border-primary relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-sm font-medium">
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-sm font-medium"
+            >
               Beliebt
-            </div>
+            </motion.div>
             <h3 className="text-lg font-semibold text-text-secondary mb-2">Pro</h3>
             <div className="mb-1">
               <span className="text-4xl font-bold text-text">4,50€</span>
@@ -483,7 +583,7 @@ export const Landing = () => {
               </li>
             </ul>
             <a
-              href="mailto:hello@ramboeck-it.com?subject=PostPilot%20Enterprise%20Anfrage"
+              href="mailto:hello@ramboeck-it.com?subject=MailSort%20Enterprise%20Anfrage"
               className="w-full py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium flex items-center justify-center gap-2"
             >
               <MessageSquare className="w-4 h-4" />
@@ -502,10 +602,10 @@ export const Landing = () => {
               Für IT-Administratoren
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-text mb-4">
-              PostPilot für Ihr Unternehmen freigeben
+              MailSort für Ihr Unternehmen freigeben
             </h2>
             <p className="text-lg text-text-secondary max-w-2xl mx-auto">
-              Als IT-Admin können Sie PostPilot zentral für alle Mitarbeiter Ihrer Organisation freigeben.
+              Als IT-Admin können Sie MailSort zentral für alle Mitarbeiter Ihrer Organisation freigeben.
               Nach einmaliger Genehmigung können sich alle Benutzer selbstständig anmelden.
             </p>
           </div>
@@ -581,7 +681,7 @@ export const Landing = () => {
 
       {/* Beta Signup Section */}
       <section className="bg-gradient-to-br from-primary to-primary-dark py-16">
-        <div className="max-w-2xl mx-auto px-4 text-center">
+        <AnimatedSection className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
             Werde Beta-Tester und spare 50%
           </h2>
@@ -628,13 +728,13 @@ export const Landing = () => {
           <p className="text-white/60 text-sm mt-4">
             Kein Spam. Jederzeit abmelden. Deine Daten sind sicher.
           </p>
-        </div>
+        </AnimatedSection>
       </section>
 
       {/* Security & DSGVO Section */}
       <section id="security" className="bg-gray-50 py-16">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-12">
+          <AnimatedSection className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
               <ShieldCheck className="w-4 h-4" />
               100% DSGVO-konform
@@ -643,10 +743,10 @@ export const Landing = () => {
               Volle Transparenz bei Datenschutz & Sicherheit
             </h2>
             <p className="text-lg text-text-secondary max-w-2xl mx-auto">
-              Wir wissen, dass E-Mails sensible Daten enthalten. Deshalb haben wir PostPilot
+              Wir wissen, dass E-Mails sensible Daten enthalten. Deshalb haben wir MailSort
               von Grund auf mit Datenschutz im Fokus entwickelt.
             </p>
-          </div>
+          </AnimatedSection>
 
           {/* What we DO and DON'T do */}
           <div className="grid md:grid-cols-2 gap-8 mb-12">
@@ -761,7 +861,7 @@ export const Landing = () => {
                 <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mb-2">
                   <Eye className="w-8 h-8 text-green-600" />
                 </div>
-                <span className="text-sm font-medium">PostPilot liest</span>
+                <span className="text-sm font-medium">MailSort liest</span>
                 <span className="text-xs text-text-secondary">Nur Betreff & Body</span>
               </div>
 
@@ -850,7 +950,7 @@ export const Landing = () => {
                 <Mail className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <span className="text-xl font-bold">PostPilot</span>
+                <span className="text-xl font-bold">MailSort</span>
                 <p className="text-xs text-gray-400">by Ramböck IT</p>
               </div>
             </div>

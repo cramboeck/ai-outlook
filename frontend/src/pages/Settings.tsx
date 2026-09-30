@@ -40,6 +40,7 @@ import {
   type FontSize,
 } from '../services/themeService';
 import { RulesManager } from '../components/settings/RulesManager';
+import { CopilotSettings } from '../components/settings/CopilotSettings';
 
 const SIGNATURE_STORAGE_KEY = 'postpilot_signature';
 
@@ -81,7 +82,7 @@ const CategoryEditModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+      <div className="bg-card rounded-xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h3 className="text-lg font-semibold text-text">
             {isNew ? 'Neue Kategorie' : 'Kategorie bearbeiten'}
@@ -162,7 +163,7 @@ const CategoryEditModal = ({
                   <ChevronDown className="w-4 h-4 ml-auto text-text-secondary" />
                 </button>
                 {showColorPicker && (
-                  <div className="absolute top-full mt-1 left-0 w-full bg-white border border-border rounded-lg shadow-lg z-10 p-2">
+                  <div className="absolute top-full mt-1 left-0 w-full bg-card border border-border rounded-lg shadow-lg z-10 p-2">
                     <div className="grid grid-cols-5 gap-2">
                       {AVAILABLE_PRESETS.map((preset) => (
                         <button
@@ -198,7 +199,7 @@ const CategoryEditModal = ({
                   <ChevronDown className="w-4 h-4 ml-auto text-text-secondary" />
                 </button>
                 {showEmojiPicker && (
-                  <div className="absolute top-full mt-1 left-0 w-full bg-white border border-border rounded-lg shadow-lg z-10 p-2">
+                  <div className="absolute top-full mt-1 left-0 w-full bg-card border border-border rounded-lg shadow-lg z-10 p-2">
                     <div className="grid grid-cols-6 gap-1">
                       {AVAILABLE_EMOJIS.map((e) => (
                         <button
@@ -396,11 +397,11 @@ export const Settings = () => {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold text-text">Einstellungen</h1>
-        <p className="text-text-secondary">Verwalten Sie Ihre PostPilot Konfiguration</p>
+        <p className="text-text-secondary">Verwalten Sie Ihre MailSort Konfiguration</p>
       </div>
 
       {/* Display Settings Section */}
-      <div className="bg-white rounded-xl border border-border">
+      <div className="bg-card rounded-xl border border-border">
         <div className="px-6 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Monitor className="w-5 h-5 text-primary" />
@@ -502,7 +503,7 @@ export const Settings = () => {
       </div>
 
       {/* Categories Section */}
-      <div className="bg-white rounded-xl border border-border">
+      <div className="bg-card rounded-xl border border-border">
         <div className="px-6 py-4 border-b border-border">
           <div className="flex items-center justify-between">
             <div>
@@ -665,11 +666,14 @@ export const Settings = () => {
         </div>
       </div>
 
+      {/* Copilot Premium Section */}
+      <CopilotSettings />
+
       {/* Rules Section */}
       <RulesManager />
 
       {/* Signature Section */}
-      <div className="bg-white rounded-xl border border-border">
+      <div className="bg-card rounded-xl border border-border">
         <div className="px-6 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <FileSignature className="w-5 h-5 text-primary" />
@@ -722,7 +726,7 @@ export const Settings = () => {
           {/* Signature Input/Preview */}
           {showPreview ? (
             <div
-              className="min-h-[150px] max-h-[250px] overflow-y-auto border border-border rounded-lg p-4 bg-white"
+              className="min-h-[150px] max-h-[250px] overflow-y-auto border border-border rounded-lg p-4 bg-bg"
               contentEditable
               onInput={(e) => setSignature(e.currentTarget.innerHTML)}
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(signature) }}
